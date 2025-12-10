@@ -6,8 +6,8 @@ interface OnboardingGuideProps {
   authToken: string;
 }
 
-const API_URL = `http://${window.location.hostname}:8080`;
-const RELAY_URL = `ws://${window.location.hostname}:8080/ws`;
+const API_URL = `${window.location.protocol}//${window.location.host}`;
+const RELAY_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
 
 export function OnboardingGuide({ authToken }: OnboardingGuideProps) {
   const { t } = useLanguage();

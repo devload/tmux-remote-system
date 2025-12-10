@@ -7,7 +7,7 @@ interface TokenManagerProps {
   onClose: () => void;
 }
 
-const API_URL = `http://${window.location.hostname}:8080`;
+const API_URL = `${window.location.protocol}//${window.location.host}`;
 
 export function TokenManager({ authToken, onClose }: TokenManagerProps) {
   const { t } = useLanguage();

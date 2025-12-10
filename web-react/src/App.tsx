@@ -9,7 +9,8 @@ import { useWebSocket } from './hooks/useWebSocket';
 import { SessionInfo } from './types';
 import './App.css';
 
-const WS_URL = `ws://${window.location.hostname}:8080/ws`;
+const WS_PROTOCOL = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const WS_URL = `${WS_PROTOCOL}//${window.location.host}/ws`;
 
 function App() {
   const [authToken, setAuthToken] = useState<string | null>(() => {
