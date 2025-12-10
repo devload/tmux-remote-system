@@ -1,0 +1,40 @@
+# TMUX Remote Host Agent Configuration
+# Copy this file to ~/.tmux-remote.yml
+
+# Unique identifier for this machine
+machineId: home
+
+# WebSocket URL of the relay server
+# For local development: ws://localhost:8080/ws
+# For production: wss://relay.yourdomain.com/ws
+relay: ws://localhost:8080/ws
+
+# List of tmux sessions to expose
+sessions:
+  # Each session needs:
+  # - id: Unique identifier (recommended format: machineId/sessionName)
+  # - tmuxSession: Name of the tmux session to attach
+  # - label: Human-readable name shown in the UI
+
+  - id: home/work
+    tmuxSession: work
+    label: "Home · Work"
+
+  - id: home/dev
+    tmuxSession: dev
+    label: "Home · Development"
+
+  - id: home/monitoring
+    tmuxSession: monitor
+    label: "Home · System Monitor"
+
+# Example for a server machine:
+# machineId: server
+# relay: wss://relay.yourdomain.com/ws
+# sessions:
+#   - id: server/main
+#     tmuxSession: main
+#     label: "Server · Main"
+#   - id: server/logs
+#     tmuxSession: logs
+#     label: "Server · Log Monitor"

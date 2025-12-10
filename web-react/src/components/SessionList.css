@@ -1,0 +1,86 @@
+.session-list {
+  width: 260px;
+  background-color: #202123;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #2d2d30;
+}
+
+.session-list-header {
+  padding: 16px;
+  border-bottom: 1px solid #2d2d30;
+}
+
+.session-list-header h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ececf1;
+}
+
+.session-groups {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.session-group {
+  margin-bottom: 16px;
+}
+
+.group-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: #8e8ea0;
+  text-transform: uppercase;
+  padding: 8px 12px;
+  letter-spacing: 0.5px;
+}
+
+.session-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #ececf1;
+  transition: background-color 0.15s;
+}
+
+.session-item:hover {
+  background-color: #2d2d30;
+}
+
+.session-item.active {
+  background-color: #343541;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot.online {
+  background-color: #10a37f;
+}
+
+.status-dot.offline {
+  background-color: #6e6e80;
+}
+
+.session-label {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.no-sessions {
+  padding: 16px;
+  color: #6e6e80;
+  text-align: center;
+  font-size: 14px;
+}

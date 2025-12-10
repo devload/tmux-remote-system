@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: tmux-host-agent
+  main:
+    web-application-type: none
+
+logging:
+  level:
+    com.tmuxremote: DEBUG

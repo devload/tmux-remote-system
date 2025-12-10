@@ -1,0 +1,11 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: tmux-relay-server
+
+logging:
+  level:
+    com.tmuxremote: DEBUG
+    org.springframework.web.socket: INFO

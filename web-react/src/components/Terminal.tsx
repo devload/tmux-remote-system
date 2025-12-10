@@ -1,0 +1,166 @@
+import { useEffect, useRef, useCallback, useState } from 'react';
+import { Terminal as XTerm } from 'xterm';
+import { FitAddon } from 'xterm-addon-fit';
+import 'xterm/css/xterm.css';
+import './Terminal.css';
+
+interface TerminalProps {
+  sessionId: string | null;
+  sessionLabel: string | null;
+  status: 'online' | 'offline';
+  connectionStatus: string;
+  onInput: (data: string) => void;
+}
+
+export function Terminal({
+  sessionId,
+  sessionLabel,
+  status,
+  connectionStatus,
+  onInput
+}: TerminalProps) {
+  const terminalRef = useRef<HTMLDivElement>(null);
+  const xtermRef = useRef<XTerm | null>(null);
+  const fitAddonRef = useRef<FitAddon | null>(null);
+  const [isReady, setIsReady] = useState(false);
+
+  // Cleanup on unmount or session change
+  useEffect(() => {
+    return () => {
+      if (xtermRef.current) {
+        xtermRef.current.dispose();
+        xtermRef.current = null;
+        fitAddonRef.current = null;
+        setIsReady(false);
+      }
+    };
+  }, [sessionId]);
+
+  // Initialize terminal after DOM is ready
+  useEffect(() => {
+    if (!sessionId || !terminalRef.current || xtermRef.current) return;
+
+    // Small delay to ensure DOM is fully rendered
+    const initTimer = setTimeout(() => {
+      if (!terminalRef.current) return;
+
+      const xterm = new XTerm({
+        cursorBlink: true,
+        fontSize: 14,
+        fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+        rows: 24,
+        cols: 80,
+        scrollback: 1000,
+        theme: {
+          background: '#1e1e1e',
+          foreground: '#d4d4d4',
+          cursor: '#d4d4d4',
+          cursorAccent: '#1e1e1e',
+          selectionBackground: '#264f78',
+        },
+      });
+
+      const fitAddon = new FitAddon();
+      xterm.loadAddon(fitAddon);
+
+      xterm.open(terminalRef.current);
+
+      xtermRef.current = xterm;
+      fitAddonRef.current = fitAddon;
+
+      // Fit after a delay
+      setTimeout(() => {
+        if (fitAddonRef.current && terminalRef.current) {
+          try {
+            fitAddonRef.current.fit();
+          } catch (e) {
+            // ignore
+          }
+        }
+        setIsReady(true);
+      }, 50);
+
+      xterm.onData((data) => {
+        onInput(data);
+      });
+
+    }, 100);
+
+    return () => clearTimeout(initTimer);
+  }, [sessionId, onInput]);
+
+  // Handle window resize
+  useEffect(() => {
+    if (!isReady) return;
+
+    const handleResize = () => {
+      if (fitAddonRef.current) {
+        try {
+          fitAddonRef.current.fit();
+        } catch (e) {
+          // ignore
+        }
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isReady]);
+
+  const writeToTerminal = useCallback((data: string) => {
+    if (xtermRef.current && isReady) {
+      try {
+        // Decode base64 to UTF-8 properly
+        const binaryString = atob(data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        const decoded = new TextDecoder('utf-8').decode(bytes);
+        xtermRef.current.write(decoded);
+      } catch (e) {
+        console.error('Failed to decode/write:', e);
+      }
+    }
+  }, [isReady]);
+
+  useEffect(() => {
+    (window as any).__writeToTerminal = writeToTerminal;
+    return () => {
+      delete (window as any).__writeToTerminal;
+    };
+  }, [writeToTerminal]);
+
+  return (
+    <div className="terminal-container">
+      <div className="terminal-header">
+        <div className="header-left">
+          <span className={`connection-status ${connectionStatus}`} />
+          <span className="session-title">
+            {sessionLabel || sessionId || 'Select a session'}
+          </span>
+        </div>
+        <div className="header-right">
+          {sessionId && (
+            <span className={`session-status ${status}`}>
+              {status === 'online' ? 'Connected' : 'Disconnected'}
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="terminal-content">
+        {sessionId ? (
+          <div ref={terminalRef} className="xterm-wrapper" />
+        ) : (
+          <div className="terminal-placeholder">
+            <p>Select a session from the sidebar to connect</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function getTerminalWriter(): ((data: string) => void) | null {
+  return (window as any).__writeToTerminal || null;
+}

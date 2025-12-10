@@ -1,0 +1,87 @@
+.command-bar {
+  background-color: #252526;
+  border-top: 1px solid #2d2d30;
+  padding: 12px 16px;
+}
+
+.quick-commands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.quick-cmd-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  background-color: #2d2d30;
+  color: #ececf1;
+  border: 1px solid #404040;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+}
+
+.quick-cmd-btn:hover:not(:disabled) {
+  background-color: #3e3e42;
+  border-color: #505050;
+}
+
+.quick-cmd-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.command-input-container {
+  display: flex;
+  gap: 12px;
+}
+
+.command-input {
+  flex: 1;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  background-color: #1e1e1e;
+  color: #ececf1;
+  border: 1px solid #404040;
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.command-input:focus {
+  border-color: #10a37f;
+}
+
+.command-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.command-input::placeholder {
+  color: #6e6e80;
+}
+
+.send-btn {
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 500;
+  background-color: #10a37f;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.send-btn:hover:not(:disabled) {
+  background-color: #0d8c6d;
+}
+
+.send-btn:disabled {
+  background-color: #3e3e42;
+  color: #6e6e80;
+  cursor: not-allowed;
+}

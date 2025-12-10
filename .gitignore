@@ -1,0 +1,36 @@
+# Java
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.log
+
+# Maven
+.mvn/
+mvnw
+mvnw.cmd
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Node
+node_modules/
+dist/
+.cache/
+
+# Logs
+*.log
+logs/
+
+# Build outputs
+build/
+
+# Environment
+.env
+.env.local
