@@ -23,34 +23,46 @@ public class SessionManager {
     private final ObjectMapper objectMapper;
     private final Map<String, SessionInfo> sessions = new ConcurrentHashMap<>();
     private final Map<String, WebSocketSession> viewerSessionMap = new ConcurrentHashMap<>();
+    // viewerId -> ownerEmail (for filtering sessions)
+    private final Map<String, String> viewerOwnerMap = new ConcurrentHashMap<>();
 
-    public void registerHost(String sessionId, String label, String machineId, WebSocketSession wsSession) {
+    public void registerHost(String sessionId, String label, String machineId, String ownerEmail, WebSocketSession wsSession) {
         SessionInfo existing = sessions.get(sessionId);
         if (existing != null && existing.getHostSession() != null) {
             log.warn("Host already registered for session: {}, replacing", sessionId);
         }
 
-        SessionInfo sessionInfo = SessionInfo.create(sessionId, label, machineId, wsSession);
+        SessionInfo sessionInfo = SessionInfo.create(sessionId, label, machineId, ownerEmail, wsSession);
         if (existing != null) {
             sessionInfo.setViewers(existing.getViewers());
         }
         sessions.put(sessionId, sessionInfo);
 
-        log.info("Host registered: session={}, machine={}", sessionId, machineId);
-        broadcastSessionList();
+        log.info("Host registered: session={}, machine={}, owner={}", sessionId, machineId, ownerEmail);
+        broadcastSessionListToOwner(ownerEmail);
     }
 
-    public void registerViewer(String sessionId, WebSocketSession wsSession) {
+    public void registerViewer(String sessionId, String ownerEmail, WebSocketSession wsSession) {
         viewerSessionMap.put(wsSession.getId(), wsSession);
+        viewerOwnerMap.put(wsSession.getId(), ownerEmail);
+
+        // Remove viewer from all other sessions first
+        sessions.values().forEach(info -> info.getViewers().remove(wsSession));
 
         SessionInfo sessionInfo = sessions.get(sessionId);
         if (sessionInfo != null) {
+            // Check if viewer owns this session
+            if (ownerEmail != null && !ownerEmail.equals(sessionInfo.getOwnerEmail())) {
+                log.warn("Viewer {} tried to access session {} owned by {}", ownerEmail, sessionId, sessionInfo.getOwnerEmail());
+                return;
+            }
             sessionInfo.getViewers().add(wsSession);
-            log.info("Viewer registered: session={}, viewerId={}", sessionId, wsSession.getId());
+            log.info("Viewer registered: session={}, viewerId={}, owner={}", sessionId, wsSession.getId(), ownerEmail);
         } else {
             SessionInfo newSession = SessionInfo.builder()
                     .id(sessionId)
                     .status("offline")
+                    .ownerEmail(ownerEmail)
                     .viewers(ConcurrentHashMap.newKeySet())
                     .build();
             newSession.getViewers().add(wsSession);
@@ -91,14 +103,11 @@ public class SessionManager {
         sendMessage(sessionInfo.getHostSession(), keysMessage);
     }
 
-    public void sendSessionList(WebSocketSession wsSession) {
+    public void sendSessionList(WebSocketSession wsSession, String ownerEmail) {
         List<SessionListItem> sessionList = sessions.values().stream()
+                .filter(info -> ownerEmail == null || ownerEmail.equals(info.getOwnerEmail()))
                 .map(SessionListItem::from)
                 .toList();
-
-        Message listMessage = Message.builder()
-                .type("sessionList")
-                .build();
 
         try {
             String json = objectMapper.writeValueAsString(Map.of(
@@ -120,13 +129,16 @@ public class SessionManager {
                 log.info("Host disconnected: session={}", sessionId);
 
                 broadcastSessionStatus(sessionId, "offline");
-                broadcastSessionList();
+                if (info.getOwnerEmail() != null) {
+                    broadcastSessionListToOwner(info.getOwnerEmail());
+                }
             }
 
             info.getViewers().remove(wsSession);
         });
 
         viewerSessionMap.remove(wsSession.getId());
+        viewerOwnerMap.remove(wsSession.getId());
     }
 
     private void broadcastToViewers(SessionInfo sessionInfo, Message message) {
@@ -134,11 +146,6 @@ public class SessionManager {
     }
 
     private void broadcastSessionStatus(String sessionId, String status) {
-        Message statusMessage = Message.builder()
-                .type("sessionStatus")
-                .session(sessionId)
-                .build();
-
         try {
             String json = objectMapper.writeValueAsString(Map.of(
                     "type", "sessionStatus",
@@ -163,8 +170,9 @@ public class SessionManager {
         }
     }
 
-    private void broadcastSessionList() {
+    private void broadcastSessionListToOwner(String ownerEmail) {
         List<SessionListItem> sessionList = sessions.values().stream()
+                .filter(info -> ownerEmail == null || ownerEmail.equals(info.getOwnerEmail()))
                 .map(SessionListItem::from)
                 .toList();
 
@@ -174,13 +182,16 @@ public class SessionManager {
                     "sessions", sessionList
             ));
 
-            viewerSessionMap.values().forEach(viewer -> {
-                try {
-                    if (viewer.isOpen()) {
-                        viewer.sendMessage(new TextMessage(json));
+            viewerSessionMap.forEach((viewerId, viewer) -> {
+                String viewerOwner = viewerOwnerMap.get(viewerId);
+                if (ownerEmail == null || ownerEmail.equals(viewerOwner)) {
+                    try {
+                        if (viewer.isOpen()) {
+                            viewer.sendMessage(new TextMessage(json));
+                        }
+                    } catch (IOException e) {
+                        log.error("Failed to broadcast session list", e);
                     }
-                } catch (IOException e) {
-                    log.error("Failed to broadcast session list", e);
                 }
             });
         } catch (IOException e) {

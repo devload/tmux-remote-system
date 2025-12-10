@@ -9,6 +9,11 @@ machineId: home
 # For production: wss://relay.yourdomain.com/ws
 relay: ws://localhost:8080/ws
 
+# Agent token for owner identification
+# Generate this token from the web UI after login
+# Only users with this token can see your sessions
+token: agt_9fjiq-09mHplsJWgSz2dZuYDz2riFR7I
+
 # List of tmux sessions to expose
 sessions:
   # Each session needs:

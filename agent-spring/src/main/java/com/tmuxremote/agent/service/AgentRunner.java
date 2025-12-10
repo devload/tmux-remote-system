@@ -24,6 +24,7 @@ public class AgentRunner implements CommandLineRunner {
 
     private String machineId;
     private String relayUrl;
+    private String agentToken;
     private static final long SCAN_INTERVAL_SECONDS = 5;
 
     @Override
@@ -33,7 +34,9 @@ public class AgentRunner implements CommandLineRunner {
         AgentConfig config = configLoader.loadConfig();
         this.machineId = config.getMachineId();
         this.relayUrl = config.getRelay();
-        log.info("Loaded configuration: machineId={}, relay={}", machineId, relayUrl);
+        this.agentToken = config.getToken();
+        log.info("Loaded configuration: machineId={}, relay={}, token={}",
+                machineId, relayUrl, agentToken != null ? "present" : "none");
 
         // Initial scan
         scanAndUpdateSessions();
@@ -78,7 +81,7 @@ public class AgentRunner implements CommandLineRunner {
         sessionConfig.setTmuxSession(tmuxSession);
         sessionConfig.setLabel(tmuxSession);
 
-        TmuxSessionHandler handler = new TmuxSessionHandler(sessionConfig, machineId, relayUrl);
+        TmuxSessionHandler handler = new TmuxSessionHandler(sessionConfig, machineId, relayUrl, agentToken);
         handlers.put(tmuxSession, handler);
         handler.start();
 

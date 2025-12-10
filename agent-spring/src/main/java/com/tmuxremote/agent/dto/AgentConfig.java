@@ -7,6 +7,7 @@ import java.util.List;
 public class AgentConfig {
     private String machineId;
     private String relay;
+    private String token;  // Agent token for owner identification
     private List<SessionConfig> sessions;
 
     @Data

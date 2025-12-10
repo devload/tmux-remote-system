@@ -18,6 +18,7 @@ public class TmuxSessionHandler {
     private final AgentConfig.SessionConfig sessionConfig;
     private final String machineId;
     private final String relayUrl;
+    private final String agentToken;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean captureStarted = new AtomicBoolean(false);
@@ -28,10 +29,11 @@ public class TmuxSessionHandler {
     private static final int CAPTURE_INTERVAL_MS = 100;
     private static final long FORCE_SEND_INTERVAL_MS = 5000;
 
-    public TmuxSessionHandler(AgentConfig.SessionConfig sessionConfig, String machineId, String relayUrl) {
+    public TmuxSessionHandler(AgentConfig.SessionConfig sessionConfig, String machineId, String relayUrl, String agentToken) {
         this.sessionConfig = sessionConfig;
         this.machineId = machineId;
         this.relayUrl = relayUrl;
+        this.agentToken = agentToken;
     }
 
     public void start() {
@@ -68,7 +70,7 @@ public class TmuxSessionHandler {
 
     private void startWebSocketClient() throws Exception {
         URI uri = new URI(relayUrl);
-        wsClient = new RelayWebSocketClient(uri, sessionConfig, machineId, this::handleKeysInput);
+        wsClient = new RelayWebSocketClient(uri, sessionConfig, machineId, agentToken, this::handleKeysInput);
         wsClient.connectBlocking();
         log.info("WebSocket client connected for session: {}", sessionConfig.getId());
     }

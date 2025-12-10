@@ -23,6 +23,7 @@ public class RelayWebSocketClient extends WebSocketClient {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final AgentConfig.SessionConfig sessionConfig;
     private final String machineId;
+    private final String agentToken;
     private final Consumer<String> onKeysReceived;
     private final AtomicBoolean isConnected = new AtomicBoolean(false);
     private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
@@ -32,10 +33,11 @@ public class RelayWebSocketClient extends WebSocketClient {
     private static final int BASE_RECONNECT_DELAY_MS = 1000;
 
     public RelayWebSocketClient(URI serverUri, AgentConfig.SessionConfig sessionConfig,
-                                String machineId, Consumer<String> onKeysReceived) {
+                                String machineId, String agentToken, Consumer<String> onKeysReceived) {
         super(serverUri);
         this.sessionConfig = sessionConfig;
         this.machineId = machineId;
+        this.agentToken = agentToken;
         this.onKeysReceived = onKeysReceived;
     }
 
@@ -79,19 +81,24 @@ public class RelayWebSocketClient extends WebSocketClient {
 
     private void registerAsHost() {
         try {
+            Map<String, String> meta = new java.util.HashMap<>();
+            meta.put("label", sessionConfig.getLabel());
+            meta.put("machineId", machineId);
+            if (agentToken != null && !agentToken.isEmpty()) {
+                meta.put("token", agentToken);
+            }
+
             Message registerMsg = Message.builder()
                     .type("register")
                     .role("host")
                     .session(sessionConfig.getId())
-                    .meta(Map.of(
-                            "label", sessionConfig.getLabel(),
-                            "machineId", machineId
-                    ))
+                    .meta(meta)
                     .build();
 
             String json = objectMapper.writeValueAsString(registerMsg);
             send(json);
-            log.info("Registered as host for session: {}", sessionConfig.getId());
+            log.info("Registered as host for session: {} (token: {})", sessionConfig.getId(),
+                    agentToken != null ? "present" : "none");
         } catch (Exception e) {
             log.error("Failed to register as host", e);
         }

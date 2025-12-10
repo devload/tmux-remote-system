@@ -18,15 +18,17 @@ public class SessionInfo {
     private String label;
     private String machineId;
     private String status;
+    private String ownerEmail;  // Owner of this session (from agent token)
     private WebSocketSession hostSession;
     private Set<WebSocketSession> viewers;
 
-    public static SessionInfo create(String id, String label, String machineId, WebSocketSession hostSession) {
+    public static SessionInfo create(String id, String label, String machineId, String ownerEmail, WebSocketSession hostSession) {
         return SessionInfo.builder()
                 .id(id)
                 .label(label)
                 .machineId(machineId)
                 .status("online")
+                .ownerEmail(ownerEmail)
                 .hostSession(hostSession)
                 .viewers(ConcurrentHashMap.newKeySet())
                 .build();

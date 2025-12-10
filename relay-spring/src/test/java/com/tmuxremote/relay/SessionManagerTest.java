@@ -19,6 +19,7 @@ class SessionManagerTest {
 
     private SessionManager sessionManager;
     private ObjectMapper objectMapper;
+    private static final String TEST_OWNER = "test@example.com";
 
     @BeforeEach
     void setUp() {
@@ -35,7 +36,7 @@ class SessionManagerTest {
         when(mockSession.isOpen()).thenReturn(true);
 
         // When
-        sessionManager.registerHost("test/dev", "Test Dev", "test-machine", mockSession);
+        sessionManager.registerHost("test/dev", "Test Dev", "test-machine", TEST_OWNER, mockSession);
 
         // Then - verify by requesting session list
         WebSocketSession viewerSession = mock(WebSocketSession.class);
@@ -49,7 +50,7 @@ class SessionManagerTest {
             return null;
         }).when(viewerSession).sendMessage(any(TextMessage.class));
 
-        sessionManager.sendSessionList(viewerSession);
+        sessionManager.sendSessionList(viewerSession, TEST_OWNER);
 
         assertNotNull(capturedMessage.get());
         assertTrue(capturedMessage.get().contains("test/dev"));
@@ -69,8 +70,8 @@ class SessionManagerTest {
         when(viewerSession.isOpen()).thenReturn(true);
 
         // When
-        sessionManager.registerHost("test/dev", "Test Dev", "test-machine", hostSession);
-        sessionManager.registerViewer("test/dev", viewerSession);
+        sessionManager.registerHost("test/dev", "Test Dev", "test-machine", TEST_OWNER, hostSession);
+        sessionManager.registerViewer("test/dev", TEST_OWNER, viewerSession);
 
         // Then - no exception means success
         assertDoesNotThrow(() -> sessionManager.handleScreen("test/dev", "dGVzdA=="));
@@ -95,8 +96,8 @@ class SessionManagerTest {
             return null;
         }).when(viewerSession).sendMessage(any(TextMessage.class));
 
-        sessionManager.registerHost("test/dev", "Test Dev", "test-machine", hostSession);
-        sessionManager.registerViewer("test/dev", viewerSession);
+        sessionManager.registerHost("test/dev", "Test Dev", "test-machine", TEST_OWNER, hostSession);
+        sessionManager.registerViewer("test/dev", TEST_OWNER, viewerSession);
 
         // When
         sessionManager.handleScreen("test/dev", "SGVsbG8gV29ybGQ="); // "Hello World" in base64
@@ -125,7 +126,7 @@ class SessionManagerTest {
         WebSocketSession viewerSession = mock(WebSocketSession.class);
         when(viewerSession.getId()).thenReturn("viewer-1");
 
-        sessionManager.registerHost("test/dev", "Test Dev", "test-machine", hostSession);
+        sessionManager.registerHost("test/dev", "Test Dev", "test-machine", TEST_OWNER, hostSession);
 
         // When
         sessionManager.handleKeys("test/dev", "ls -la\n", viewerSession);
@@ -144,7 +145,7 @@ class SessionManagerTest {
         when(hostSession.getId()).thenReturn("host-1");
         when(hostSession.isOpen()).thenReturn(true);
 
-        sessionManager.registerHost("test/dev", "Test Dev", "test-machine", hostSession);
+        sessionManager.registerHost("test/dev", "Test Dev", "test-machine", TEST_OWNER, hostSession);
 
         // When
         sessionManager.handleDisconnect(hostSession);
@@ -161,7 +162,7 @@ class SessionManagerTest {
             return null;
         }).when(viewerSession).sendMessage(any(TextMessage.class));
 
-        sessionManager.sendSessionList(viewerSession);
+        sessionManager.sendSessionList(viewerSession, TEST_OWNER);
 
         assertNotNull(capturedMessage.get());
         assertTrue(capturedMessage.get().contains("offline"));
@@ -181,7 +182,7 @@ class SessionManagerTest {
         when(hostSession.getId()).thenReturn("host-1");
         when(hostSession.isOpen()).thenReturn(true);
 
-        sessionManager.registerHost("machine1/session1", "Session 1", "machine1", hostSession);
+        sessionManager.registerHost("machine1/session1", "Session 1", "machine1", TEST_OWNER, hostSession);
 
         WebSocketSession viewerSession = mock(WebSocketSession.class);
         when(viewerSession.getId()).thenReturn("viewer-1");
@@ -195,7 +196,7 @@ class SessionManagerTest {
         }).when(viewerSession).sendMessage(any(TextMessage.class));
 
         // When
-        sessionManager.sendSessionList(viewerSession);
+        sessionManager.sendSessionList(viewerSession, TEST_OWNER);
 
         // Then
         String response = capturedMessage.get();
@@ -206,5 +207,44 @@ class SessionManagerTest {
         assertTrue(response.contains("\"label\":\"Session 1\""));
         assertTrue(response.contains("\"machineId\":\"machine1\""));
         assertTrue(response.contains("\"status\":\"online\""));
+    }
+
+    @Test
+    @DisplayName("다른 소유자의 세션은 보이지 않아야 함")
+    void testOwnerFiltering() throws IOException {
+        // Given
+        String owner1 = "user1@example.com";
+        String owner2 = "user2@example.com";
+
+        WebSocketSession host1 = mock(WebSocketSession.class);
+        when(host1.getId()).thenReturn("host-1");
+        when(host1.isOpen()).thenReturn(true);
+
+        WebSocketSession host2 = mock(WebSocketSession.class);
+        when(host2.getId()).thenReturn("host-2");
+        when(host2.isOpen()).thenReturn(true);
+
+        sessionManager.registerHost("machine1/session1", "Session 1", "machine1", owner1, host1);
+        sessionManager.registerHost("machine2/session2", "Session 2", "machine2", owner2, host2);
+
+        // When - owner1 requests session list
+        WebSocketSession viewerSession = mock(WebSocketSession.class);
+        when(viewerSession.getId()).thenReturn("viewer-1");
+        when(viewerSession.isOpen()).thenReturn(true);
+
+        AtomicReference<String> capturedMessage = new AtomicReference<>();
+        doAnswer(invocation -> {
+            TextMessage msg = invocation.getArgument(0);
+            capturedMessage.set(msg.getPayload());
+            return null;
+        }).when(viewerSession).sendMessage(any(TextMessage.class));
+
+        sessionManager.sendSessionList(viewerSession, owner1);
+
+        // Then - should only see owner1's session
+        String response = capturedMessage.get();
+        assertNotNull(response);
+        assertTrue(response.contains("machine1/session1"));
+        assertFalse(response.contains("machine2/session2"));
     }
 }

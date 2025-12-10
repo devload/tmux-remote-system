@@ -4,8 +4,30 @@ server:
 spring:
   application:
     name: tmux-relay-server
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:your-google-client-id}
+            client-secret: ${GOOGLE_CLIENT_SECRET:your-google-client-secret}
+            scope:
+              - email
+              - profile
+
+app:
+  frontend:
+    url: ${FRONTEND_URL:http://localhost:3000}
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:3000}
+  auth:
+    allowed-domains: ${ALLOWED_DOMAINS:}  # Comma-separated list, e.g., "company.com,gmail.com"
+  jwt:
+    secret: ${JWT_SECRET:tmux-remote-super-secret-key-for-jwt-token-256bits}
+    expiration-ms: 86400000  # 24 hours
 
 logging:
   level:
     com.tmuxremote: DEBUG
     org.springframework.web.socket: INFO
+    org.springframework.security: DEBUG

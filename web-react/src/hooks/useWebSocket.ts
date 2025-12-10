@@ -6,6 +6,7 @@ const MAX_RECONNECT_DELAY = 30000;
 
 interface UseWebSocketOptions {
   url: string;
+  token?: string | null;
   onScreen?: (sessionId: string, data: string) => void;
   onSessionList?: (sessions: SessionInfo[]) => void;
   onSessionStatus?: (sessionId: string, status: string) => void;
@@ -13,6 +14,7 @@ interface UseWebSocketOptions {
 
 export function useWebSocket({
   url,
+  token,
   onScreen,
   onSessionList,
   onSessionStatus,
@@ -26,7 +28,9 @@ export function useWebSocket({
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
     setStatus('connecting');
-    const ws = new WebSocket(url);
+    // Add token as query parameter for authentication
+    const wsUrl = token ? `${url}?token=${encodeURIComponent(token)}` : url;
+    const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
       console.log('WebSocket connected');
@@ -82,7 +86,7 @@ export function useWebSocket({
     };
 
     wsRef.current = ws;
-  }, [url, onScreen, onSessionList, onSessionStatus]);
+  }, [url, token, onScreen, onSessionList, onSessionStatus]);
 
   const scheduleReconnect = useCallback(() => {
     const attempts = reconnectAttempts.current++;

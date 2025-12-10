@@ -2,6 +2,8 @@ package com.tmuxremote.relay.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tmuxremote.relay.dto.Message;
+import com.tmuxremote.relay.security.JwtTokenProvider;
+import com.tmuxremote.relay.service.AgentTokenService;
 import com.tmuxremote.relay.service.SessionManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,7 +13,9 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+import java.net.URI;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Component
@@ -20,6 +24,11 @@ public class RelayWebSocketHandler extends TextWebSocketHandler {
 
     private final ObjectMapper objectMapper;
     private final SessionManager sessionManager;
+    private final AgentTokenService agentTokenService;
+    private final JwtTokenProvider jwtTokenProvider;
+
+    // sessionId -> ownerEmail (extracted from token)
+    private final Map<String, String> sessionOwnerMap = new ConcurrentHashMap<>();
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
@@ -55,12 +64,32 @@ public class RelayWebSocketHandler extends TextWebSocketHandler {
             Map<String, String> meta = message.getMeta();
             String label = meta != null ? meta.get("label") : sessionId;
             String machineId = meta != null ? meta.get("machineId") : "unknown";
+            String agentToken = meta != null ? meta.get("token") : null;
 
-            sessionManager.registerHost(sessionId, label, machineId, session);
-            log.info("Host registered: session={}, machine={}", sessionId, machineId);
+            // Validate agent token and get owner
+            String ownerEmail = null;
+            if (agentToken != null) {
+                ownerEmail = agentTokenService.getOwnerByToken(agentToken).orElse(null);
+                if (ownerEmail == null) {
+                    log.warn("Invalid agent token for session: {}", sessionId);
+                    // Allow registration but without owner (for backward compatibility)
+                }
+            }
+
+            if (ownerEmail != null) {
+                sessionOwnerMap.put(session.getId(), ownerEmail);
+            }
+            sessionManager.registerHost(sessionId, label, machineId, ownerEmail, session);
+            log.info("Host registered: session={}, machine={}, owner={}", sessionId, machineId, ownerEmail);
+
         } else if ("viewer".equals(role)) {
-            sessionManager.registerViewer(sessionId, session);
-            log.info("Viewer registered: session={}", sessionId);
+            // Get owner from JWT token (passed as query param)
+            String ownerEmail = extractOwnerFromSession(session);
+            if (ownerEmail != null) {
+                sessionOwnerMap.put(session.getId(), ownerEmail);
+            }
+            sessionManager.registerViewer(sessionId, ownerEmail, session);
+            log.info("Viewer registered: session={}, owner={}", sessionId, ownerEmail);
         }
     }
 
@@ -73,13 +102,45 @@ public class RelayWebSocketHandler extends TextWebSocketHandler {
     }
 
     private void handleListSessions(WebSocketSession session) {
-        sessionManager.sendSessionList(session);
+        String ownerEmail = extractOwnerFromSession(session);
+        sessionManager.sendSessionList(session, ownerEmail);
+    }
+
+    private String extractOwnerFromSession(WebSocketSession session) {
+        // First check if we already have it cached
+        String cached = sessionOwnerMap.get(session.getId());
+        if (cached != null) {
+            return cached;
+        }
+
+        // Try to extract from query param
+        try {
+            URI uri = session.getUri();
+            if (uri != null && uri.getQuery() != null) {
+                String query = uri.getQuery();
+                for (String param : query.split("&")) {
+                    String[] pair = param.split("=");
+                    if (pair.length == 2 && "token".equals(pair[0])) {
+                        String token = java.net.URLDecoder.decode(pair[1], "UTF-8");
+                        if (jwtTokenProvider.validateToken(token)) {
+                            String email = jwtTokenProvider.getEmailFromToken(token);
+                            sessionOwnerMap.put(session.getId(), email);
+                            return email;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to extract owner from session", e);
+        }
+        return null;
     }
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         log.info("WebSocket disconnected: id={}, status={}", session.getId(), status);
         sessionManager.handleDisconnect(session);
+        sessionOwnerMap.remove(session.getId());
     }
 
     @Override
