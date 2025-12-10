@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { SessionList } from './components/SessionList';
 import { Terminal, getTerminalWriter } from './components/Terminal';
 import { CommandBar } from './components/CommandBar';
@@ -12,6 +12,19 @@ function App() {
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [currentSession, setCurrentSession] = useState<string | null>(null);
   const currentSessionRef = useRef<string | null>(null);
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    const saved = localStorage.getItem('theme');
+    return (saved === 'light' || saved === 'dark') ? saved : 'light';
+  });
+
+  useEffect(() => {
+    document.documentElement.className = theme === 'light' ? 'light' : '';
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  }, []);
 
   const handleScreen = useCallback((sessionId: string, data: string) => {
     // Use ref to always get current session value
@@ -60,6 +73,8 @@ function App() {
         sessions={sessions}
         currentSession={currentSession}
         onSelectSession={handleSelectSession}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
       <div className="main-content">
         <Terminal
@@ -68,6 +83,7 @@ function App() {
           status={currentSessionInfo?.status || 'offline'}
           connectionStatus={status}
           onInput={(data) => currentSession && sendKeys(currentSession, data)}
+          theme={theme}
         />
         <CommandBar
           onSend={handleSendCommand}

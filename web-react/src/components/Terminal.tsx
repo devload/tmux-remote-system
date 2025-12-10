@@ -10,14 +10,32 @@ interface TerminalProps {
   status: 'online' | 'offline';
   connectionStatus: string;
   onInput: (data: string) => void;
+  theme: 'dark' | 'light';
 }
+
+const darkTheme = {
+  background: '#1e1e1e',
+  foreground: '#d4d4d4',
+  cursor: '#d4d4d4',
+  cursorAccent: '#1e1e1e',
+  selectionBackground: '#264f78',
+};
+
+const lightTheme = {
+  background: '#ffffff',
+  foreground: '#1a1a1a',
+  cursor: '#1a1a1a',
+  cursorAccent: '#ffffff',
+  selectionBackground: '#b4d5fe',
+};
 
 export function Terminal({
   sessionId,
   sessionLabel,
   status,
   connectionStatus,
-  onInput
+  onInput,
+  theme
 }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
@@ -51,13 +69,7 @@ export function Terminal({
         rows: 24,
         cols: 80,
         scrollback: 1000,
-        theme: {
-          background: '#1e1e1e',
-          foreground: '#d4d4d4',
-          cursor: '#d4d4d4',
-          cursorAccent: '#1e1e1e',
-          selectionBackground: '#264f78',
-        },
+        theme: theme === 'light' ? lightTheme : darkTheme,
       });
 
       const fitAddon = new FitAddon();
@@ -106,6 +118,13 @@ export function Terminal({
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [isReady]);
+
+  // Handle theme change
+  useEffect(() => {
+    if (xtermRef.current && isReady) {
+      xtermRef.current.options.theme = theme === 'light' ? lightTheme : darkTheme;
+    }
+  }, [theme, isReady]);
 
   const writeToTerminal = useCallback((data: string) => {
     if (xtermRef.current && isReady) {

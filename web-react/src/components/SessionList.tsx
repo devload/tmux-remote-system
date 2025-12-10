@@ -5,9 +5,11 @@ interface SessionListProps {
   sessions: SessionInfo[];
   currentSession: string | null;
   onSelectSession: (sessionId: string) => void;
+  theme: 'dark' | 'light';
+  onToggleTheme: () => void;
 }
 
-export function SessionList({ sessions, currentSession, onSelectSession }: SessionListProps) {
+export function SessionList({ sessions, currentSession, onSelectSession, theme, onToggleTheme }: SessionListProps) {
   const groupedSessions = sessions.reduce((acc, session) => {
     const machine = session.machineId || 'Unknown';
     if (!acc[machine]) {
@@ -21,6 +23,9 @@ export function SessionList({ sessions, currentSession, onSelectSession }: Sessi
     <div className="session-list">
       <div className="session-list-header">
         <h2>Sessions</h2>
+        <button className="theme-toggle" onClick={onToggleTheme} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
+          {theme === 'dark' ? '☀️' : '🌙'}
+        </button>
       </div>
       <div className="session-groups">
         {Object.entries(groupedSessions).map(([machineId, machineSessions]) => (

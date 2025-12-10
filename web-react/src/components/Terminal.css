@@ -2,8 +2,9 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  background-color: #1e1e1e;
+  background-color: var(--bg-primary);
   overflow: hidden;
+  transition: background-color 0.2s;
 }
 
 .terminal-header {
@@ -11,8 +12,9 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  background-color: #252526;
-  border-bottom: 1px solid #2d2d30;
+  background-color: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color 0.2s, border-color 0.2s;
 }
 
 .header-left {
@@ -28,16 +30,16 @@
 }
 
 .connection-status.connected {
-  background-color: #10a37f;
+  background-color: var(--accent);
 }
 
 .connection-status.connecting {
-  background-color: #f5a623;
+  background-color: var(--warning);
   animation: pulse 1.5s infinite;
 }
 
 .connection-status.disconnected {
-  background-color: #ef4444;
+  background-color: var(--danger);
 }
 
 @keyframes pulse {
@@ -48,7 +50,7 @@
 .session-title {
   font-size: 14px;
   font-weight: 500;
-  color: #ececf1;
+  color: var(--text-primary);
 }
 
 .header-right {
@@ -64,12 +66,12 @@
 
 .session-status.online {
   background-color: rgba(16, 163, 127, 0.2);
-  color: #10a37f;
+  color: var(--accent);
 }
 
 .session-status.offline {
   background-color: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
+  color: var(--danger);
 }
 
 .terminal-content {
@@ -88,7 +90,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #6e6e80;
+  color: var(--text-muted);
 }
 
 .terminal-placeholder p {

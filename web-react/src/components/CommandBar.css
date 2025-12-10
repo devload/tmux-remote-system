@@ -1,7 +1,8 @@
 .command-bar {
-  background-color: #252526;
-  border-top: 1px solid #2d2d30;
+  background-color: var(--bg-tertiary);
+  border-top: 1px solid var(--border-color);
   padding: 12px 16px;
+  transition: background-color 0.2s, border-color 0.2s;
 }
 
 .quick-commands {
@@ -14,9 +15,9 @@
 .quick-cmd-btn {
   padding: 6px 12px;
   font-size: 12px;
-  background-color: #2d2d30;
-  color: #ececf1;
-  border: 1px solid #404040;
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+  border: 1px solid var(--border-hover);
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s;
@@ -24,8 +25,8 @@
 }
 
 .quick-cmd-btn:hover:not(:disabled) {
-  background-color: #3e3e42;
-  border-color: #505050;
+  background-color: var(--bg-active);
+  border-color: var(--text-muted);
 }
 
 .quick-cmd-btn:disabled {
@@ -43,16 +44,16 @@
   padding: 12px 16px;
   font-size: 14px;
   font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
-  background-color: #1e1e1e;
-  color: #ececf1;
-  border: 1px solid #404040;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border-hover);
   border-radius: 6px;
   outline: none;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, background-color 0.2s;
 }
 
 .command-input:focus {
-  border-color: #10a37f;
+  border-color: var(--accent);
 }
 
 .command-input:disabled {
@@ -61,14 +62,14 @@
 }
 
 .command-input::placeholder {
-  color: #6e6e80;
+  color: var(--text-muted);
 }
 
 .send-btn {
   padding: 12px 24px;
   font-size: 14px;
   font-weight: 500;
-  background-color: #10a37f;
+  background-color: var(--accent);
   color: white;
   border: none;
   border-radius: 6px;
@@ -77,11 +78,11 @@
 }
 
 .send-btn:hover:not(:disabled) {
-  background-color: #0d8c6d;
+  background-color: var(--accent-hover);
 }
 
 .send-btn:disabled {
-  background-color: #3e3e42;
-  color: #6e6e80;
+  background-color: var(--bg-hover);
+  color: var(--text-muted);
   cursor: not-allowed;
 }

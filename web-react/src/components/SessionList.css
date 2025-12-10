@@ -1,21 +1,40 @@
 .session-list {
   width: 260px;
-  background-color: #202123;
+  background-color: var(--bg-secondary);
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #2d2d30;
+  border-right: 1px solid var(--border-color);
+  transition: background-color 0.2s, border-color 0.2s;
 }
 
 .session-list-header {
   padding: 16px;
-  border-bottom: 1px solid #2d2d30;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .session-list-header h2 {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #ececf1;
+  color: var(--text-primary);
+}
+
+.theme-toggle {
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.theme-toggle:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--border-hover);
 }
 
 .session-groups {
@@ -31,7 +50,7 @@
 .group-header {
   font-size: 12px;
   font-weight: 600;
-  color: #8e8ea0;
+  color: var(--text-secondary);
   text-transform: uppercase;
   padding: 8px 12px;
   letter-spacing: 0.5px;
@@ -44,16 +63,16 @@
   padding: 12px;
   border-radius: 6px;
   cursor: pointer;
-  color: #ececf1;
+  color: var(--text-primary);
   transition: background-color 0.15s;
 }
 
 .session-item:hover {
-  background-color: #2d2d30;
+  background-color: var(--bg-hover);
 }
 
 .session-item.active {
-  background-color: #343541;
+  background-color: var(--bg-active);
 }
 
 .status-dot {
@@ -64,11 +83,11 @@
 }
 
 .status-dot.online {
-  background-color: #10a37f;
+  background-color: var(--accent);
 }
 
 .status-dot.offline {
-  background-color: #6e6e80;
+  background-color: var(--text-muted);
 }
 
 .session-label {
@@ -80,7 +99,7 @@
 
 .no-sessions {
   padding: 16px;
-  color: #6e6e80;
+  color: var(--text-muted);
   text-align: center;
   font-size: 14px;
 }

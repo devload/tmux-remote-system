@@ -4,6 +4,52 @@
   box-sizing: border-box;
 }
 
+/* Dark theme (default) */
+:root {
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #202123;
+  --bg-tertiary: #252526;
+  --bg-hover: #2d2d30;
+  --bg-active: #343541;
+  --bg-input: #1e1e1e;
+  --border-color: #2d2d30;
+  --border-hover: #404040;
+  --text-primary: #ececf1;
+  --text-secondary: #8e8ea0;
+  --text-muted: #6e6e80;
+  --accent: #10a37f;
+  --accent-hover: #0d8c6d;
+  --danger: #ef4444;
+  --warning: #f5a623;
+  --terminal-bg: #1e1e1e;
+  --terminal-fg: #d4d4d4;
+  --terminal-cursor: #d4d4d4;
+  --terminal-selection: #264f78;
+}
+
+/* Light theme */
+:root.light {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f7f7f8;
+  --bg-tertiary: #efefef;
+  --bg-hover: #e5e5e5;
+  --bg-active: #dcdcdc;
+  --bg-input: #ffffff;
+  --border-color: #d9d9d9;
+  --border-hover: #b0b0b0;
+  --text-primary: #1a1a1a;
+  --text-secondary: #5a5a5a;
+  --text-muted: #8a8a8a;
+  --accent: #10a37f;
+  --accent-hover: #0d8c6d;
+  --danger: #dc2626;
+  --warning: #d97706;
+  --terminal-bg: #ffffff;
+  --terminal-fg: #1a1a1a;
+  --terminal-cursor: #1a1a1a;
+  --terminal-selection: #b4d5fe;
+}
+
 html, body, #root {
   height: 100%;
   width: 100%;
@@ -11,8 +57,9 @@ html, body, #root {
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-  background-color: #1e1e1e;
-  color: #ececf1;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.2s, color 0.2s;
 }
 
 .app {
