@@ -71,6 +71,72 @@
   text-transform: uppercase;
   padding: 8px 12px;
   letter-spacing: 0.5px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.add-session-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.add-session-btn:hover {
+  background-color: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.create-session-input {
+  display: flex;
+  gap: 6px;
+  padding: 4px 12px 8px 12px;
+}
+
+.create-session-input input {
+  flex: 1;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.create-session-input input:focus {
+  border-color: var(--accent);
+}
+
+.create-session-input button {
+  background-color: var(--accent);
+  border: none;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.create-session-input button:hover:not(:disabled) {
+  background-color: var(--accent-hover);
+}
+
+.create-session-input button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .session-item {
@@ -112,6 +178,31 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
+}
+
+.session-item.has-update {
+  background-color: var(--bg-update);
+}
+
+.update-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #ff6b6b;
+  flex-shrink: 0;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.9);
+  }
 }
 
 .no-sessions {

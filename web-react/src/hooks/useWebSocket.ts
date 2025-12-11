@@ -128,6 +128,31 @@ export function useWebSocket({
     }
   }, []);
 
+  const createSession = useCallback((machineId: string, sessionName: string) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'createSession',
+        meta: {
+          machineId,
+          sessionName,
+        },
+      }));
+    }
+  }, []);
+
+  const sendResize = useCallback((sessionId: string, cols: number, rows: number) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'resize',
+        session: sessionId,
+        meta: {
+          cols: String(cols),
+          rows: String(rows),
+        },
+      }));
+    }
+  }, []);
+
   useEffect(() => {
     connect();
     return () => {
@@ -140,5 +165,7 @@ export function useWebSocket({
     joinSession,
     sendKeys,
     refreshSessions,
+    createSession,
+    sendResize,
   };
 }

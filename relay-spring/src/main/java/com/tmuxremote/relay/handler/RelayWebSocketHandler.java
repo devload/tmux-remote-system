@@ -48,7 +48,10 @@ public class RelayWebSocketHandler extends TextWebSocketHandler {
                 case "register" -> handleRegister(session, message);
                 case "screen" -> handleScreen(message);
                 case "keys" -> handleKeys(session, message);
+                case "resize" -> handleResize(session, message);
                 case "listSessions" -> handleListSessions(session);
+                case "createSession" -> handleCreateSession(session, message);
+                case "sessionCreated" -> handleSessionCreated(message);
                 default -> log.warn("Unknown message type: {}", message.getType());
             }
         } catch (Exception e) {
@@ -101,9 +104,47 @@ public class RelayWebSocketHandler extends TextWebSocketHandler {
         sessionManager.handleKeys(message.getSession(), message.getPayload(), session);
     }
 
+    private void handleResize(WebSocketSession session, Message message) {
+        Map<String, String> meta = message.getMeta();
+        if (meta == null) return;
+
+        String colsStr = meta.get("cols");
+        String rowsStr = meta.get("rows");
+        if (colsStr == null || rowsStr == null) return;
+
+        try {
+            int cols = Integer.parseInt(colsStr);
+            int rows = Integer.parseInt(rowsStr);
+            log.debug("Resize request: session={}, cols={}, rows={}", message.getSession(), cols, rows);
+            sessionManager.handleResize(message.getSession(), cols, rows);
+        } catch (NumberFormatException e) {
+            log.warn("Invalid resize dimensions: cols={}, rows={}", colsStr, rowsStr);
+        }
+    }
+
     private void handleListSessions(WebSocketSession session) {
         String ownerEmail = extractOwnerFromSession(session);
         sessionManager.sendSessionList(session, ownerEmail);
+    }
+
+    private void handleCreateSession(WebSocketSession session, Message message) {
+        String ownerEmail = extractOwnerFromSession(session);
+        String machineId = message.getMeta() != null ? message.getMeta().get("machineId") : null;
+        String sessionName = message.getMeta() != null ? message.getMeta().get("sessionName") : null;
+
+        if (machineId == null || sessionName == null) {
+            log.warn("createSession missing machineId or sessionName");
+            return;
+        }
+
+        log.info("Create session request: machine={}, session={}, owner={}", machineId, sessionName, ownerEmail);
+        sessionManager.forwardCreateSession(machineId, sessionName, ownerEmail);
+    }
+
+    private void handleSessionCreated(Message message) {
+        String sessionId = message.getSession();
+        log.info("Session created: {}", sessionId);
+        // The new session will auto-register via the agent's scanner
     }
 
     private String extractOwnerFromSession(WebSocketSession session) {

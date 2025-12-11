@@ -103,9 +103,27 @@ public class SessionManager {
         sendMessage(sessionInfo.getHostSession(), keysMessage);
     }
 
+    public void handleResize(String sessionId, int cols, int rows) {
+        SessionInfo sessionInfo = sessions.get(sessionId);
+        if (sessionInfo == null || sessionInfo.getHostSession() == null) {
+            log.warn("Resize for unavailable session: {}", sessionId);
+            return;
+        }
+
+        Message resizeMessage = Message.builder()
+                .type("resize")
+                .session(sessionId)
+                .meta(Map.of("cols", String.valueOf(cols), "rows", String.valueOf(rows)))
+                .build();
+
+        sendMessage(sessionInfo.getHostSession(), resizeMessage);
+        log.debug("Forwarded resize to host: session={}, cols={}, rows={}", sessionId, cols, rows);
+    }
+
     public void sendSessionList(WebSocketSession wsSession, String ownerEmail) {
         List<SessionListItem> sessionList = sessions.values().stream()
-                .filter(info -> ownerEmail == null || ownerEmail.equals(info.getOwnerEmail()))
+                // Only show sessions that belong to this user (exact match required)
+                .filter(info -> ownerEmail != null && ownerEmail.equals(info.getOwnerEmail()))
                 .map(SessionListItem::from)
                 .toList();
 
@@ -172,7 +190,8 @@ public class SessionManager {
 
     private void broadcastSessionListToOwner(String ownerEmail) {
         List<SessionListItem> sessionList = sessions.values().stream()
-                .filter(info -> ownerEmail == null || ownerEmail.equals(info.getOwnerEmail()))
+                // Only show sessions that belong to this user (exact match required)
+                .filter(info -> ownerEmail != null && ownerEmail.equals(info.getOwnerEmail()))
                 .map(SessionListItem::from)
                 .toList();
 
@@ -208,5 +227,38 @@ public class SessionManager {
         } catch (IOException e) {
             log.error("Failed to send message to session {}", session.getId(), e);
         }
+    }
+
+    public void forwardCreateSession(String machineId, String sessionName, String ownerEmail) {
+        // Find any host session for this machineId owned by this user
+        sessions.values().stream()
+                .filter(info -> info.getId().startsWith(machineId + "/"))
+                .filter(info -> ownerEmail == null || ownerEmail.equals(info.getOwnerEmail()))
+                .filter(info -> info.getHostSession() != null && info.getHostSession().isOpen())
+                .findFirst()
+                .ifPresentOrElse(
+                        info -> {
+                            Message createMsg = Message.builder()
+                                    .type("createSession")
+                                    .meta(Map.of("sessionName", sessionName))
+                                    .build();
+                            sendMessage(info.getHostSession(), createMsg);
+                            log.info("Forwarded createSession to machine: {}, session: {}", machineId, sessionName);
+                        },
+                        () -> log.warn("No active host found for machine: {}", machineId)
+                );
+    }
+
+    public List<String> getActiveMachines(String ownerEmail) {
+        return sessions.values().stream()
+                .filter(info -> ownerEmail == null || ownerEmail.equals(info.getOwnerEmail()))
+                .filter(info -> info.getHostSession() != null && info.getHostSession().isOpen())
+                .map(info -> {
+                    String id = info.getId();
+                    int slashIdx = id.indexOf('/');
+                    return slashIdx > 0 ? id.substring(0, slashIdx) : id;
+                })
+                .distinct()
+                .toList();
     }
 }

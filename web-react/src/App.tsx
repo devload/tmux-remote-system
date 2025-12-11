@@ -52,6 +52,7 @@ function App() {
 
   const [showTokenManager, setShowTokenManager] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [updatedSessions, setUpdatedSessions] = useState<Set<string>>(new Set());
 
   const handleScreen = useCallback((sessionId: string, data: string) => {
     // Use ref to always get current session value
@@ -60,6 +61,13 @@ function App() {
       if (writer) {
         writer(data);
       }
+    } else {
+      // Mark session as having new updates (only if not currently viewing)
+      setUpdatedSessions(prev => {
+        const next = new Set(prev);
+        next.add(sessionId);
+        return next;
+      });
     }
   }, []);
 
@@ -73,7 +81,7 @@ function App() {
     ));
   }, []);
 
-  const { status, joinSession, sendKeys } = useWebSocket({
+  const { status, joinSession, sendKeys, createSession, sendResize } = useWebSocket({
     url: WS_URL,
     token: authToken,
     onScreen: handleScreen,
@@ -81,11 +89,21 @@ function App() {
     onSessionStatus: handleSessionStatus,
   });
 
+  const handleCreateSession = useCallback((machineId: string, sessionName: string) => {
+    createSession(machineId, sessionName);
+  }, [createSession]);
+
   const handleSelectSession = (sessionId: string) => {
     currentSessionRef.current = sessionId;
     setCurrentSession(sessionId);
     joinSession(sessionId);
     setSidebarOpen(false); // Close sidebar on mobile after selection
+    // Clear update indicator when selecting session
+    setUpdatedSessions(prev => {
+      const next = new Set(prev);
+      next.delete(sessionId);
+      return next;
+    });
   };
 
   const handleSendCommand = (command: string) => {
@@ -127,6 +145,8 @@ function App() {
         onLogout={handleLogout}
         onManageTokens={() => setShowTokenManager(true)}
         isOpen={sidebarOpen}
+        onCreateSession={handleCreateSession}
+        updatedSessions={updatedSessions}
       />
       {showTokenManager && authToken && (
         <TokenManager
@@ -145,6 +165,7 @@ function App() {
               status={currentSessionInfo?.status || 'offline'}
               connectionStatus={status}
               onInput={(data) => currentSession && sendKeys(currentSession, data)}
+              onResize={(cols, rows) => currentSession && sendResize(currentSession, cols, rows)}
               theme={theme}
             />
             <CommandBar

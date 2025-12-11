@@ -19,6 +19,7 @@ public class TmuxSessionHandler {
     private final String machineId;
     private final String relayUrl;
     private final String agentToken;
+    private final java.util.function.Consumer<String> onCreateSession;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean captureStarted = new AtomicBoolean(false);
@@ -29,11 +30,13 @@ public class TmuxSessionHandler {
     private static final int CAPTURE_INTERVAL_MS = 100;
     private static final long FORCE_SEND_INTERVAL_MS = 5000;
 
-    public TmuxSessionHandler(AgentConfig.SessionConfig sessionConfig, String machineId, String relayUrl, String agentToken) {
+    public TmuxSessionHandler(AgentConfig.SessionConfig sessionConfig, String machineId, String relayUrl, String agentToken,
+                              java.util.function.Consumer<String> onCreateSession) {
         this.sessionConfig = sessionConfig;
         this.machineId = machineId;
         this.relayUrl = relayUrl;
         this.agentToken = agentToken;
+        this.onCreateSession = onCreateSession;
     }
 
     public void start() {
@@ -70,7 +73,7 @@ public class TmuxSessionHandler {
 
     private void startWebSocketClient() throws Exception {
         URI uri = new URI(relayUrl);
-        wsClient = new RelayWebSocketClient(uri, sessionConfig, machineId, agentToken, this::handleKeysInput);
+        wsClient = new RelayWebSocketClient(uri, sessionConfig, machineId, agentToken, this::handleKeysInput, onCreateSession, this::handleResize);
         wsClient.connectBlocking();
         log.info("WebSocket client connected for session: {}", sessionConfig.getId());
     }
@@ -106,9 +109,9 @@ public class TmuxSessionHandler {
 
     private String capturePane() {
         try {
-            // Use -p for stdout, no -e to avoid complex escape sequences
+            // Use -p for stdout, -e for escape sequences (colors), -N to preserve trailing spaces
             ProcessBuilder pb = new ProcessBuilder(
-                "tmux", "capture-pane", "-t", sessionConfig.getTmuxSession(), "-p", "-N"
+                "tmux", "capture-pane", "-t", sessionConfig.getTmuxSession(), "-p", "-e", "-N"
             );
             pb.redirectErrorStream(false);
 
@@ -139,6 +142,21 @@ public class TmuxSessionHandler {
         } catch (Exception e) {
             log.error("Failed to capture pane", e);
             return null;
+        }
+    }
+
+    private void handleResize(int cols, int rows) {
+        try {
+            // Resize the tmux window/pane
+            ProcessBuilder pb = new ProcessBuilder(
+                "tmux", "resize-window", "-t", sessionConfig.getTmuxSession(), "-x", String.valueOf(cols), "-y", String.valueOf(rows)
+            );
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+            process.waitFor(2, TimeUnit.SECONDS);
+            log.info("Resized tmux session {} to {}x{}", sessionConfig.getTmuxSession(), cols, rows);
+        } catch (Exception e) {
+            log.error("Failed to resize tmux session", e);
         }
     }
 

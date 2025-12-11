@@ -10,6 +10,7 @@ interface TerminalProps {
   status: 'online' | 'offline';
   connectionStatus: string;
   onInput: (data: string) => void;
+  onResize?: (cols: number, rows: number) => void;
   theme: 'dark' | 'light';
 }
 
@@ -35,6 +36,7 @@ export function Terminal({
   status,
   connectionStatus,
   onInput,
+  onResize,
   theme
 }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -106,9 +108,15 @@ export function Terminal({
     if (!isReady) return;
 
     const handleResize = () => {
-      if (fitAddonRef.current) {
+      if (fitAddonRef.current && xtermRef.current) {
         try {
           fitAddonRef.current.fit();
+          // Send new size to server
+          const cols = xtermRef.current.cols;
+          const rows = xtermRef.current.rows;
+          if (onResize && cols > 0 && rows > 0) {
+            onResize(cols, rows);
+          }
         } catch (e) {
           // ignore
         }
@@ -116,8 +124,10 @@ export function Terminal({
     };
 
     window.addEventListener('resize', handleResize);
+    // Trigger initial resize
+    handleResize();
     return () => window.removeEventListener('resize', handleResize);
-  }, [isReady]);
+  }, [isReady, onResize]);
 
   // Handle theme change
   useEffect(() => {

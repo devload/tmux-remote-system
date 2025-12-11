@@ -81,11 +81,49 @@ public class AgentRunner implements CommandLineRunner {
         sessionConfig.setTmuxSession(tmuxSession);
         sessionConfig.setLabel(tmuxSession);
 
-        TmuxSessionHandler handler = new TmuxSessionHandler(sessionConfig, machineId, relayUrl, agentToken);
+        TmuxSessionHandler handler = new TmuxSessionHandler(sessionConfig, machineId, relayUrl, agentToken, this::createTmuxSession);
         handlers.put(tmuxSession, handler);
         handler.start();
 
         log.info("Started handler for session: {}", sessionConfig.getId());
+    }
+
+    private void createTmuxSession(String sessionName) {
+        try {
+            // Sanitize session name (only allow alphanumeric, dash, underscore)
+            String sanitized = sessionName.replaceAll("[^a-zA-Z0-9_-]", "_");
+            if (sanitized.isEmpty()) {
+                log.warn("Invalid session name: {}", sessionName);
+                return;
+            }
+
+            // Check if session already exists
+            if (handlers.containsKey(sanitized)) {
+                log.warn("Session already exists: {}", sanitized);
+                return;
+            }
+
+            log.info("Creating new tmux session: {}", sanitized);
+
+            ProcessBuilder pb = new ProcessBuilder(
+                "tmux", "new-session", "-d", "-s", sanitized
+            );
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+
+            // Wait and check result
+            boolean completed = process.waitFor(5, TimeUnit.SECONDS);
+            if (completed && process.exitValue() == 0) {
+                log.info("Successfully created tmux session: {}", sanitized);
+                // The session will be auto-discovered by the next scan cycle
+                // Force immediate scan
+                scheduler.execute(this::scanAndUpdateSessions);
+            } else {
+                log.error("Failed to create tmux session: {}, exitCode: {}", sanitized, process.exitValue());
+            }
+        } catch (Exception e) {
+            log.error("Error creating tmux session: {}", sessionName, e);
+        }
     }
 
     private void stopSessionHandler(String tmuxSession) {

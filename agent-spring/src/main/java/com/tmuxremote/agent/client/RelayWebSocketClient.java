@@ -25,6 +25,8 @@ public class RelayWebSocketClient extends WebSocketClient {
     private final String machineId;
     private final String agentToken;
     private final Consumer<String> onKeysReceived;
+    private final Consumer<String> onCreateSession;
+    private final java.util.function.BiConsumer<Integer, Integer> onResize;
     private final AtomicBoolean isConnected = new AtomicBoolean(false);
     private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
@@ -33,12 +35,16 @@ public class RelayWebSocketClient extends WebSocketClient {
     private static final int BASE_RECONNECT_DELAY_MS = 1000;
 
     public RelayWebSocketClient(URI serverUri, AgentConfig.SessionConfig sessionConfig,
-                                String machineId, String agentToken, Consumer<String> onKeysReceived) {
+                                String machineId, String agentToken, Consumer<String> onKeysReceived,
+                                Consumer<String> onCreateSession,
+                                java.util.function.BiConsumer<Integer, Integer> onResize) {
         super(serverUri);
         this.sessionConfig = sessionConfig;
         this.machineId = machineId;
         this.agentToken = agentToken;
         this.onKeysReceived = onKeysReceived;
+        this.onCreateSession = onCreateSession;
+        this.onResize = onResize;
     }
 
     @Override
@@ -59,6 +65,27 @@ public class RelayWebSocketClient extends WebSocketClient {
                 String keys = msg.getPayload();
                 if (keys != null && onKeysReceived != null) {
                     onKeysReceived.accept(keys);
+                }
+            } else if ("resize".equals(msg.getType()) && sessionConfig.getId().equals(msg.getSession())) {
+                Map<String, String> meta = msg.getMeta();
+                if (meta != null && onResize != null) {
+                    try {
+                        int cols = Integer.parseInt(meta.get("cols"));
+                        int rows = Integer.parseInt(meta.get("rows"));
+                        log.info("Received resize request: {}x{}", cols, rows);
+                        onResize.accept(cols, rows);
+                    } catch (NumberFormatException e) {
+                        log.warn("Invalid resize dimensions");
+                    }
+                }
+            } else if ("createSession".equals(msg.getType())) {
+                Map<String, String> meta = msg.getMeta();
+                if (meta != null && onCreateSession != null) {
+                    String sessionName = meta.get("sessionName");
+                    if (sessionName != null) {
+                        log.info("Received createSession request: {}", sessionName);
+                        onCreateSession.accept(sessionName);
+                    }
                 }
             }
         } catch (Exception e) {

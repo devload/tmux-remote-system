@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { SessionInfo } from '../types';
 import { useLanguage } from '../i18n';
 import './SessionList.css';
@@ -11,10 +12,14 @@ interface SessionListProps {
   onLogout?: () => void;
   onManageTokens?: () => void;
   isOpen?: boolean;
+  onCreateSession?: (machineId: string, sessionName: string) => void;
+  updatedSessions?: Set<string>;
 }
 
-export function SessionList({ sessions, currentSession, onSelectSession, theme, onToggleTheme, onLogout, onManageTokens, isOpen }: SessionListProps) {
+export function SessionList({ sessions, currentSession, onSelectSession, theme, onToggleTheme, onLogout, onManageTokens, isOpen, onCreateSession, updatedSessions }: SessionListProps) {
   const { t, lang, setLang } = useLanguage();
+  const [creatingForMachine, setCreatingForMachine] = useState<string | null>(null);
+  const [newSessionName, setNewSessionName] = useState('');
 
   const groupedSessions = sessions.reduce((acc, session) => {
     const machine = session.machineId || 'Unknown';
@@ -27,6 +32,22 @@ export function SessionList({ sessions, currentSession, onSelectSession, theme, 
 
   const toggleLanguage = () => {
     setLang(lang === 'ko' ? 'en' : 'ko');
+  };
+
+  const handleCreateSession = (machineId: string) => {
+    if (!newSessionName.trim()) return;
+    onCreateSession?.(machineId, newSessionName.trim());
+    setNewSessionName('');
+    setCreatingForMachine(null);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, machineId: string) => {
+    if (e.key === 'Enter') {
+      handleCreateSession(machineId);
+    } else if (e.key === 'Escape') {
+      setCreatingForMachine(null);
+      setNewSessionName('');
+    }
   };
 
   return (
@@ -55,17 +76,47 @@ export function SessionList({ sessions, currentSession, onSelectSession, theme, 
       <div className="session-groups">
         {Object.entries(groupedSessions).map(([machineId, machineSessions]) => (
           <div key={machineId} className="session-group">
-            <div className="group-header">{machineId}</div>
-            {machineSessions.map((session) => (
-              <div
-                key={session.id}
-                className={`session-item ${currentSession === session.id ? 'active' : ''}`}
-                onClick={() => onSelectSession(session.id)}
-              >
-                <span className={`status-dot ${session.status}`} />
-                <span className="session-label">{session.label || session.id}</span>
+            <div className="group-header">
+              <span>{machineId}</span>
+              {onCreateSession && machineSessions.some(s => s.status === 'online') && (
+                <button
+                  className="add-session-btn"
+                  onClick={() => setCreatingForMachine(creatingForMachine === machineId ? null : machineId)}
+                  title={lang === 'ko' ? '새 세션' : 'New session'}
+                >
+                  +
+                </button>
+              )}
+            </div>
+            {creatingForMachine === machineId && (
+              <div className="create-session-input">
+                <input
+                  type="text"
+                  value={newSessionName}
+                  onChange={(e) => setNewSessionName(e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(e, machineId)}
+                  placeholder={lang === 'ko' ? '세션 이름' : 'Session name'}
+                  autoFocus
+                />
+                <button onClick={() => handleCreateSession(machineId)} disabled={!newSessionName.trim()}>
+                  {lang === 'ko' ? '생성' : 'Create'}
+                </button>
               </div>
-            ))}
+            )}
+            {machineSessions.map((session) => {
+              const hasUpdate = updatedSessions?.has(session.id) && currentSession !== session.id;
+              return (
+                <div
+                  key={session.id}
+                  className={`session-item ${currentSession === session.id ? 'active' : ''} ${hasUpdate ? 'has-update' : ''}`}
+                  onClick={() => onSelectSession(session.id)}
+                >
+                  <span className={`status-dot ${session.status}`} />
+                  <span className="session-label">{session.label || session.id}</span>
+                  {hasUpdate && <span className="update-indicator" />}
+                </div>
+              );
+            })}
           </div>
         ))}
         {sessions.length === 0 && (
