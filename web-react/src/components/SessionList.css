@@ -205,6 +205,70 @@
   }
 }
 
+.session-menu-container {
+  position: relative;
+  margin-left: auto;
+}
+
+.session-menu-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 16px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.15s, background-color 0.15s;
+}
+
+.session-item:hover .session-menu-btn {
+  opacity: 1;
+}
+
+.session-menu-btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.session-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+  min-width: 100px;
+  overflow: hidden;
+}
+
+.session-menu button {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background-color 0.15s;
+}
+
+.session-menu button:hover {
+  background-color: var(--bg-hover);
+}
+
+.session-menu button.danger {
+  color: var(--danger);
+}
+
+.session-menu button.danger:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
 .no-sessions {
   padding: 16px;
   color: var(--text-muted);

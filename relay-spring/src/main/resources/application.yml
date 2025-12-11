@@ -1,6 +1,16 @@
 server:
   port: 8080
-  forward-headers-strategy: framework
+  forward-headers-strategy: native
+  tomcat:
+    remoteip:
+      remote-ip-header: X-Forwarded-For
+      protocol-header: X-Forwarded-Proto
+    threads:
+      max: 200
+      min-spare: 10
+    max-connections: 500
+    accept-count: 100
+    connection-timeout: 20000
 
 spring:
   application:
@@ -30,6 +40,11 @@ app:
 
 logging:
   level:
-    com.tmuxremote: DEBUG
-    org.springframework.web.socket: INFO
-    org.springframework.security: DEBUG
+    root: WARN
+    com.tmuxremote: INFO
+    com.tmuxremote.relay.handler: WARN      # Reduce WebSocket handler logging
+    com.tmuxremote.relay.service: INFO
+    org.springframework.web.socket: WARN
+    org.springframework.security: WARN
+    org.apache.catalina: WARN
+    org.apache.tomcat: WARN

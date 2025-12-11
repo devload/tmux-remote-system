@@ -74,7 +74,7 @@ class SessionManagerTest {
         sessionManager.registerViewer("test/dev", TEST_OWNER, viewerSession);
 
         // Then - no exception means success
-        assertDoesNotThrow(() -> sessionManager.handleScreen("test/dev", "dGVzdA=="));
+        assertDoesNotThrow(() -> sessionManager.handleScreen("test/dev", "dGVzdA==", "screen"));
     }
 
     @Test
@@ -100,7 +100,7 @@ class SessionManagerTest {
         sessionManager.registerViewer("test/dev", TEST_OWNER, viewerSession);
 
         // When
-        sessionManager.handleScreen("test/dev", "SGVsbG8gV29ybGQ="); // "Hello World" in base64
+        sessionManager.handleScreen("test/dev", "SGVsbG8gV29ybGQ=", "screen"); // "Hello World" in base64
 
         // Then
         assertNotNull(capturedMessage.get());
@@ -171,7 +171,7 @@ class SessionManagerTest {
     @Test
     @DisplayName("존재하지 않는 세션에 screen 전송 시 예외가 발생하지 않아야 함")
     void testScreenToNonExistentSession() {
-        assertDoesNotThrow(() -> sessionManager.handleScreen("non-existent", "data"));
+        assertDoesNotThrow(() -> sessionManager.handleScreen("non-existent", "data", "screen"));
     }
 
     @Test

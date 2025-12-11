@@ -53,6 +53,10 @@ function App() {
   const [showTokenManager, setShowTokenManager] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [updatedSessions, setUpdatedSessions] = useState<Set<string>>(new Set());
+  const [hiddenSessions, setHiddenSessions] = useState<Set<string>>(() => {
+    const saved = localStorage.getItem('hidden_sessions');
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  });
 
   const handleScreen = useCallback((sessionId: string, data: string) => {
     // Use ref to always get current session value
@@ -81,7 +85,7 @@ function App() {
     ));
   }, []);
 
-  const { status, joinSession, sendKeys, createSession, sendResize } = useWebSocket({
+  const { status, joinSession, sendKeys, createSession, sendResize, killSession } = useWebSocket({
     url: WS_URL,
     token: authToken,
     onScreen: handleScreen,
@@ -92,6 +96,22 @@ function App() {
   const handleCreateSession = useCallback((machineId: string, sessionName: string) => {
     createSession(machineId, sessionName);
   }, [createSession]);
+
+  const handleKillSession = useCallback((sessionId: string) => {
+    killSession(sessionId);
+  }, [killSession]);
+
+  const handleHideSession = useCallback((sessionId: string) => {
+    setHiddenSessions(prev => {
+      const next = new Set(prev);
+      next.add(sessionId);
+      localStorage.setItem('hidden_sessions', JSON.stringify([...next]));
+      return next;
+    });
+  }, []);
+
+  // Filter out hidden sessions
+  const visibleSessions = sessions.filter(s => !hiddenSessions.has(s.id));
 
   const handleSelectSession = (sessionId: string) => {
     currentSessionRef.current = sessionId;
@@ -137,7 +157,7 @@ function App() {
       />
 
       <SessionList
-        sessions={sessions}
+        sessions={visibleSessions}
         currentSession={currentSession}
         onSelectSession={handleSelectSession}
         theme={theme}
@@ -146,6 +166,8 @@ function App() {
         onManageTokens={() => setShowTokenManager(true)}
         isOpen={sidebarOpen}
         onCreateSession={handleCreateSession}
+        onKillSession={handleKillSession}
+        onHideSession={handleHideSession}
         updatedSessions={updatedSessions}
       />
       {showTokenManager && authToken && (
@@ -155,7 +177,7 @@ function App() {
         />
       )}
       <div className="main-content">
-        {sessions.length === 0 ? (
+        {visibleSessions.length === 0 ? (
           <OnboardingGuide authToken={authToken} />
         ) : (
           <>

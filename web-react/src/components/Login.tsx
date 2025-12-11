@@ -6,7 +6,7 @@ interface LoginProps {
   onLoginSuccess: (token: string) => void;
 }
 
-const API_URL = `http://${window.location.hostname}:8080`;
+const API_URL = window.location.origin;
 
 export function Login({ onLoginSuccess }: LoginProps) {
   const { t, lang, setLang } = useLanguage();

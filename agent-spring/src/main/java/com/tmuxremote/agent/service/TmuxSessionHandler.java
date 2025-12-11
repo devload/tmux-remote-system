@@ -11,6 +11,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.zip.GZIPOutputStream;
 
 @Slf4j
 public class TmuxSessionHandler {
@@ -27,8 +28,17 @@ public class TmuxSessionHandler {
     private RelayWebSocketClient wsClient;
     private String lastScreen = "";
     private long lastForceSendTime = 0;
-    private static final int CAPTURE_INTERVAL_MS = 100;
-    private static final long FORCE_SEND_INTERVAL_MS = 5000;
+    private long lastChangeTime = 0;
+
+    // Capture interval: faster when active, slower when idle
+    private static final int CAPTURE_INTERVAL_ACTIVE_MS = 50;   // 50ms when recently changed
+    private static final int CAPTURE_INTERVAL_IDLE_MS = 200;    // 200ms when idle
+    private static final long ACTIVE_THRESHOLD_MS = 2000;       // Consider active if changed within 2s
+    private static final long FORCE_SEND_INTERVAL_MS = 10000;   // Force send every 10s (was 5s)
+    private static final boolean USE_COMPRESSION = true;        // Enable gzip compression
+    private static final int INITIAL_CONNECT_JITTER_MS = 5000;  // Random delay on first connect (0-5s)
+    private static final int RECONNECT_BASE_DELAY_MS = 3000;    // Base delay for reconnection
+    private static final int RECONNECT_MAX_JITTER_MS = 3000;    // Max additional jitter for reconnection
 
     public TmuxSessionHandler(AgentConfig.SessionConfig sessionConfig, String machineId, String relayUrl, String agentToken,
                               java.util.function.Consumer<String> onCreateSession) {
@@ -41,7 +51,10 @@ public class TmuxSessionHandler {
 
     public void start() {
         running.set(true);
-        scheduler.submit(this::connectAndRun);
+        // Add initial random delay to prevent thundering herd when multiple agents start simultaneously
+        int initialDelay = (int) (Math.random() * INITIAL_CONNECT_JITTER_MS);
+        log.info("Session {} will start in {} ms (jitter to prevent thundering herd)", sessionConfig.getId(), initialDelay);
+        scheduler.schedule(this::connectAndRun, initialDelay, TimeUnit.MILLISECONDS);
     }
 
     private void connectAndRun() {
@@ -60,9 +73,11 @@ public class TmuxSessionHandler {
             }
 
             if (running.get()) {
-                log.info("Reconnecting session handler for {} in 3 seconds...", sessionConfig.getId());
+                // Add jitter to reconnection delay to prevent thundering herd
+                int reconnectDelay = RECONNECT_BASE_DELAY_MS + (int) (Math.random() * RECONNECT_MAX_JITTER_MS);
+                log.info("Reconnecting session handler for {} in {} ms...", sessionConfig.getId(), reconnectDelay);
                 try {
-                    Thread.sleep(3000);
+                    Thread.sleep(reconnectDelay);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                     break;
@@ -73,38 +88,83 @@ public class TmuxSessionHandler {
 
     private void startWebSocketClient() throws Exception {
         URI uri = new URI(relayUrl);
-        wsClient = new RelayWebSocketClient(uri, sessionConfig, machineId, agentToken, this::handleKeysInput, onCreateSession, this::handleResize);
+        wsClient = new RelayWebSocketClient(uri, sessionConfig, machineId, agentToken, this::handleKeysInput, onCreateSession, this::handleResize, this::handleKillSession);
         wsClient.connectBlocking();
         log.info("WebSocket client connected for session: {}", sessionConfig.getId());
     }
 
     private void startScreenCapture() {
-        scheduler.scheduleAtFixedRate(() -> {
-            if (!running.get() || wsClient == null || !wsClient.isConnected()) {
-                return;
-            }
-
-            try {
-                String screen = capturePane();
-                if (screen != null) {
-                    long now = System.currentTimeMillis();
-                    boolean changed = !screen.equals(lastScreen);
-                    boolean forceTime = (now - lastForceSendTime) >= FORCE_SEND_INTERVAL_MS;
-
-                    if (changed || forceTime) {
-                        lastScreen = screen;
-                        lastForceSendTime = now;
-                        // Send clear screen first, then the content
-                        String fullOutput = "\u001b[2J\u001b[H" + screen;
-                        wsClient.sendScreen(fullOutput.getBytes(StandardCharsets.UTF_8));
-                    }
+        // Use adaptive capture with variable delay
+        scheduler.submit(() -> {
+            while (running.get()) {
+                if (wsClient == null || !wsClient.isConnected()) {
+                    sleep(500);
+                    continue;
                 }
-            } catch (Exception e) {
-                log.error("Error capturing screen", e);
-            }
-        }, 0, CAPTURE_INTERVAL_MS, TimeUnit.MILLISECONDS);
 
-        log.info("Started screen capture for session: {}", sessionConfig.getTmuxSession());
+                try {
+                    String screen = capturePane();
+                    if (screen != null) {
+                        long now = System.currentTimeMillis();
+                        boolean changed = !screen.equals(lastScreen);
+                        boolean forceTime = (now - lastForceSendTime) >= FORCE_SEND_INTERVAL_MS;
+
+                        if (changed || forceTime) {
+                            lastScreen = screen;
+                            lastForceSendTime = now;
+                            if (changed) {
+                                lastChangeTime = now;
+                            }
+
+                            // Send clear screen first, then the content
+                            String fullOutput = "\u001b[2J\u001b[H" + screen;
+                            byte[] data = fullOutput.getBytes(StandardCharsets.UTF_8);
+
+                            // Compress if enabled and data is large enough
+                            if (USE_COMPRESSION && data.length > 512) {
+                                data = compress(data);
+                                wsClient.sendScreenCompressed(data);
+                            } else {
+                                wsClient.sendScreen(data);
+                            }
+                        }
+
+                        // Adaptive sleep: faster when active, slower when idle
+                        boolean isActive = (now - lastChangeTime) < ACTIVE_THRESHOLD_MS;
+                        int sleepMs = isActive ? CAPTURE_INTERVAL_ACTIVE_MS : CAPTURE_INTERVAL_IDLE_MS;
+                        sleep(sleepMs);
+                    } else {
+                        sleep(CAPTURE_INTERVAL_IDLE_MS);
+                    }
+                } catch (Exception e) {
+                    log.error("Error capturing screen", e);
+                    sleep(500);
+                }
+            }
+        });
+
+        log.info("Started adaptive screen capture for session: {}", sessionConfig.getTmuxSession());
+    }
+
+    private void sleep(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private byte[] compress(byte[] data) {
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            try (GZIPOutputStream gzip = new GZIPOutputStream(baos)) {
+                gzip.write(data);
+            }
+            return baos.toByteArray();
+        } catch (IOException e) {
+            log.warn("Compression failed, sending uncompressed");
+            return data;
+        }
     }
 
     private String capturePane() {
@@ -157,6 +217,23 @@ public class TmuxSessionHandler {
             log.info("Resized tmux session {} to {}x{}", sessionConfig.getTmuxSession(), cols, rows);
         } catch (Exception e) {
             log.error("Failed to resize tmux session", e);
+        }
+    }
+
+    private void handleKillSession() {
+        try {
+            log.info("Killing tmux session: {}", sessionConfig.getTmuxSession());
+            ProcessBuilder pb = new ProcessBuilder(
+                "tmux", "kill-session", "-t", sessionConfig.getTmuxSession()
+            );
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+            process.waitFor(2, TimeUnit.SECONDS);
+            log.info("Killed tmux session: {}", sessionConfig.getTmuxSession());
+            // Stop this handler as the session is killed
+            stop();
+        } catch (Exception e) {
+            log.error("Failed to kill tmux session", e);
         }
     }
 

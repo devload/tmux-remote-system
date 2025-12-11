@@ -11,9 +11,11 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 @Service
@@ -25,6 +27,11 @@ public class SessionManager {
     private final Map<String, WebSocketSession> viewerSessionMap = new ConcurrentHashMap<>();
     // viewerId -> ownerEmail (for filtering sessions)
     private final Map<String, String> viewerOwnerMap = new ConcurrentHashMap<>();
+    // Track when sessions went offline
+    private final Map<String, Instant> offlineTimestamps = new ConcurrentHashMap<>();
+
+    // Stale session threshold (30 minutes)
+    private static final long STALE_SESSION_THRESHOLD_MS = 30 * 60 * 1000;
 
     public void registerHost(String sessionId, String label, String machineId, String ownerEmail, WebSocketSession wsSession) {
         SessionInfo existing = sessions.get(sessionId);
@@ -37,6 +44,7 @@ public class SessionManager {
             sessionInfo.setViewers(existing.getViewers());
         }
         sessions.put(sessionId, sessionInfo);
+        offlineTimestamps.remove(sessionId); // Clear offline timestamp when host connects
 
         log.info("Host registered: session={}, machine={}, owner={}", sessionId, machineId, ownerEmail);
         broadcastSessionListToOwner(ownerEmail);
@@ -71,15 +79,16 @@ public class SessionManager {
         }
     }
 
-    public void handleScreen(String sessionId, String payload) {
+    public void handleScreen(String sessionId, String payload, String type) {
         SessionInfo sessionInfo = sessions.get(sessionId);
         if (sessionInfo == null) {
             log.warn("Screen data for unknown session: {}", sessionId);
             return;
         }
 
+        // Forward with original type (screen or screenGz)
         Message screenMessage = Message.builder()
-                .type("screen")
+                .type(type)
                 .session(sessionId)
                 .payload(payload)
                 .build();
@@ -132,7 +141,11 @@ public class SessionManager {
                     "type", "sessionList",
                     "sessions", sessionList
             ));
-            wsSession.sendMessage(new TextMessage(json));
+            synchronized (wsSession) {
+                if (wsSession.isOpen()) {
+                    wsSession.sendMessage(new TextMessage(json));
+                }
+            }
         } catch (IOException e) {
             log.error("Failed to send session list", e);
         }
@@ -144,6 +157,7 @@ public class SessionManager {
                     info.getHostSession().getId().equals(wsSession.getId())) {
                 info.setHostSession(null);
                 info.setStatus("offline");
+                offlineTimestamps.put(sessionId, Instant.now()); // Track offline time
                 log.info("Host disconnected: session={}", sessionId);
 
                 broadcastSessionStatus(sessionId, "offline");
@@ -158,6 +172,51 @@ public class SessionManager {
         viewerSessionMap.remove(wsSession.getId());
         viewerOwnerMap.remove(wsSession.getId());
     }
+
+    /**
+     * Remove sessions that have been offline for longer than threshold
+     * @return number of sessions cleaned up
+     */
+    public int cleanupStaleSessions() {
+        AtomicInteger cleaned = new AtomicInteger(0);
+        Instant threshold = Instant.now().minusMillis(STALE_SESSION_THRESHOLD_MS);
+
+        offlineTimestamps.forEach((sessionId, offlineTime) -> {
+            if (offlineTime.isBefore(threshold)) {
+                SessionInfo info = sessions.get(sessionId);
+                if (info != null && "offline".equals(info.getStatus())) {
+                    sessions.remove(sessionId);
+                    offlineTimestamps.remove(sessionId);
+                    cleaned.incrementAndGet();
+                    log.info("Removed stale session: {}", sessionId);
+                }
+            }
+        });
+
+        // Also clean up closed viewer sessions
+        viewerSessionMap.entrySet().removeIf(entry -> {
+            if (!entry.getValue().isOpen()) {
+                viewerOwnerMap.remove(entry.getKey());
+                return true;
+            }
+            return false;
+        });
+
+        return cleaned.get();
+    }
+
+    /**
+     * Get current stats for monitoring
+     */
+    public Stats getStats() {
+        long online = sessions.values().stream()
+                .filter(s -> "online".equals(s.getStatus()))
+                .count();
+        int viewers = viewerSessionMap.size();
+        return new Stats(sessions.size(), (int) online, viewers);
+    }
+
+    public record Stats(int totalSessions, int onlineSessions, int totalViewers) {}
 
     private void broadcastToViewers(SessionInfo sessionInfo, Message message) {
         sessionInfo.getViewers().forEach(viewer -> sendMessage(viewer, message));
@@ -175,8 +234,10 @@ public class SessionManager {
             if (sessionInfo != null) {
                 sessionInfo.getViewers().forEach(viewer -> {
                     try {
-                        if (viewer.isOpen()) {
-                            viewer.sendMessage(new TextMessage(json));
+                        synchronized (viewer) {
+                            if (viewer.isOpen()) {
+                                viewer.sendMessage(new TextMessage(json));
+                            }
                         }
                     } catch (IOException e) {
                         log.error("Failed to send status to viewer", e);
@@ -205,8 +266,10 @@ public class SessionManager {
                 String viewerOwner = viewerOwnerMap.get(viewerId);
                 if (ownerEmail == null || ownerEmail.equals(viewerOwner)) {
                     try {
-                        if (viewer.isOpen()) {
-                            viewer.sendMessage(new TextMessage(json));
+                        synchronized (viewer) {
+                            if (viewer.isOpen()) {
+                                viewer.sendMessage(new TextMessage(json));
+                            }
                         }
                     } catch (IOException e) {
                         log.error("Failed to broadcast session list", e);
@@ -219,10 +282,15 @@ public class SessionManager {
     }
 
     private void sendMessage(WebSocketSession session, Message message) {
+        if (session == null || !session.isOpen()) {
+            return;
+        }
         try {
-            if (session != null && session.isOpen()) {
-                String json = objectMapper.writeValueAsString(message);
-                session.sendMessage(new TextMessage(json));
+            String json = objectMapper.writeValueAsString(message);
+            synchronized (session) {
+                if (session.isOpen()) {
+                    session.sendMessage(new TextMessage(json));
+                }
             }
         } catch (IOException e) {
             log.error("Failed to send message to session {}", session.getId(), e);
@@ -260,5 +328,32 @@ public class SessionManager {
                 })
                 .distinct()
                 .toList();
+    }
+
+    public void forwardKillSession(String sessionId, String ownerEmail) {
+        SessionInfo sessionInfo = sessions.get(sessionId);
+        if (sessionInfo == null) {
+            log.warn("killSession: session not found: {}", sessionId);
+            return;
+        }
+
+        // Verify ownership
+        if (ownerEmail != null && !ownerEmail.equals(sessionInfo.getOwnerEmail())) {
+            log.warn("killSession: user {} not authorized for session {} owned by {}",
+                    ownerEmail, sessionId, sessionInfo.getOwnerEmail());
+            return;
+        }
+
+        if (sessionInfo.getHostSession() == null || !sessionInfo.getHostSession().isOpen()) {
+            log.warn("killSession: host not connected for session: {}", sessionId);
+            return;
+        }
+
+        Message killMsg = Message.builder()
+                .type("killSession")
+                .session(sessionId)
+                .build();
+        sendMessage(sessionInfo.getHostSession(), killMsg);
+        log.info("Forwarded killSession to host: session={}", sessionId);
     }
 }

@@ -27,17 +27,20 @@ public class RelayWebSocketClient extends WebSocketClient {
     private final Consumer<String> onKeysReceived;
     private final Consumer<String> onCreateSession;
     private final java.util.function.BiConsumer<Integer, Integer> onResize;
+    private final Runnable onKillSession;
     private final AtomicBoolean isConnected = new AtomicBoolean(false);
     private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     private static final int MAX_RECONNECT_DELAY_MS = 30000;
     private static final int BASE_RECONNECT_DELAY_MS = 1000;
+    private static final int INITIAL_CONNECT_JITTER_MS = 3000; // Random delay on first connect
 
     public RelayWebSocketClient(URI serverUri, AgentConfig.SessionConfig sessionConfig,
                                 String machineId, String agentToken, Consumer<String> onKeysReceived,
                                 Consumer<String> onCreateSession,
-                                java.util.function.BiConsumer<Integer, Integer> onResize) {
+                                java.util.function.BiConsumer<Integer, Integer> onResize,
+                                Runnable onKillSession) {
         super(serverUri);
         this.sessionConfig = sessionConfig;
         this.machineId = machineId;
@@ -45,6 +48,7 @@ public class RelayWebSocketClient extends WebSocketClient {
         this.onKeysReceived = onKeysReceived;
         this.onCreateSession = onCreateSession;
         this.onResize = onResize;
+        this.onKillSession = onKillSession;
     }
 
     @Override
@@ -86,6 +90,11 @@ public class RelayWebSocketClient extends WebSocketClient {
                         log.info("Received createSession request: {}", sessionName);
                         onCreateSession.accept(sessionName);
                     }
+                }
+            } else if ("killSession".equals(msg.getType()) && sessionConfig.getId().equals(msg.getSession())) {
+                log.info("Received killSession request for: {}", sessionConfig.getId());
+                if (onKillSession != null) {
+                    onKillSession.run();
                 }
             }
         } catch (Exception e) {
@@ -151,6 +160,26 @@ public class RelayWebSocketClient extends WebSocketClient {
         }
     }
 
+    public void sendScreenCompressed(byte[] compressedData) {
+        if (!isConnected.get() || !isOpen()) {
+            return;
+        }
+
+        try {
+            String base64Data = Base64.getEncoder().encodeToString(compressedData);
+            Message screenMsg = Message.builder()
+                    .type("screenGz")  // Indicate compressed data
+                    .session(sessionConfig.getId())
+                    .payload(base64Data)
+                    .build();
+
+            String json = objectMapper.writeValueAsString(screenMsg);
+            send(json);
+        } catch (Exception e) {
+            log.error("Failed to send compressed screen data", e);
+        }
+    }
+
     private void scheduleReconnect() {
         int attempts = reconnectAttempts.incrementAndGet();
         int delay = calculateBackoffDelay(attempts);
@@ -176,8 +205,25 @@ public class RelayWebSocketClient extends WebSocketClient {
                 BASE_RECONNECT_DELAY_MS * Math.pow(2, attempts - 1),
                 MAX_RECONNECT_DELAY_MS
         );
-        int jitter = (int) (Math.random() * delay * 0.2);
+        // 50% jitter to spread out reconnection attempts
+        int jitter = (int) (Math.random() * delay * 0.5);
         return delay + jitter;
+    }
+
+    /**
+     * Connect with initial random delay to prevent thundering herd
+     */
+    public void connectWithJitter() {
+        int jitter = (int) (Math.random() * INITIAL_CONNECT_JITTER_MS);
+        log.info("Scheduling initial connect for session {} in {} ms", sessionConfig.getId(), jitter);
+        scheduler.schedule(() -> {
+            try {
+                connect();
+            } catch (Exception e) {
+                log.error("Initial connect failed for session {}", sessionConfig.getId(), e);
+                scheduleReconnect();
+            }
+        }, jitter, TimeUnit.MILLISECONDS);
     }
 
     public void shutdown() {

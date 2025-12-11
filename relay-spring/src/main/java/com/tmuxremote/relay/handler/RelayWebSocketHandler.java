@@ -46,12 +46,13 @@ public class RelayWebSocketHandler extends TextWebSocketHandler {
 
             switch (message.getType()) {
                 case "register" -> handleRegister(session, message);
-                case "screen" -> handleScreen(message);
+                case "screen", "screenGz" -> handleScreen(message);  // Handle both compressed and uncompressed
                 case "keys" -> handleKeys(session, message);
                 case "resize" -> handleResize(session, message);
                 case "listSessions" -> handleListSessions(session);
                 case "createSession" -> handleCreateSession(session, message);
                 case "sessionCreated" -> handleSessionCreated(message);
+                case "killSession" -> handleKillSession(session, message);
                 default -> log.warn("Unknown message type: {}", message.getType());
             }
         } catch (Exception e) {
@@ -97,7 +98,7 @@ public class RelayWebSocketHandler extends TextWebSocketHandler {
     }
 
     private void handleScreen(Message message) {
-        sessionManager.handleScreen(message.getSession(), message.getPayload());
+        sessionManager.handleScreen(message.getSession(), message.getPayload(), message.getType());
     }
 
     private void handleKeys(WebSocketSession session, Message message) {
@@ -145,6 +146,19 @@ public class RelayWebSocketHandler extends TextWebSocketHandler {
         String sessionId = message.getSession();
         log.info("Session created: {}", sessionId);
         // The new session will auto-register via the agent's scanner
+    }
+
+    private void handleKillSession(WebSocketSession session, Message message) {
+        String ownerEmail = extractOwnerFromSession(session);
+        String sessionId = message.getSession();
+
+        if (sessionId == null) {
+            log.warn("killSession missing sessionId");
+            return;
+        }
+
+        log.info("Kill session request: session={}, owner={}", sessionId, ownerEmail);
+        sessionManager.forwardKillSession(sessionId, ownerEmail);
     }
 
     private String extractOwnerFromSession(WebSocketSession session) {

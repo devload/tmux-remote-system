@@ -1,5 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ConnectionStatus, Message, SessionInfo } from '../types';
+import pako from 'pako';
+
+// Decompress gzip data from base64
+function decompressGzip(base64Data: string): string {
+  const binaryString = atob(base64Data);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  const decompressed = pako.ungzip(bytes);
+  return new TextDecoder().decode(decompressed);
+}
 
 const RECONNECT_BASE_DELAY = 1000;
 const MAX_RECONNECT_DELAY = 30000;
@@ -56,6 +68,17 @@ export function useWebSocket({
           case 'screen':
             if (message.session && message.payload) {
               onScreen?.(message.session, message.payload);
+            }
+            break;
+          case 'screenGz':
+            // Handle gzip compressed screen data
+            if (message.session && message.payload) {
+              try {
+                const decompressed = decompressGzip(message.payload);
+                onScreen?.(message.session, decompressed);
+              } catch (e) {
+                console.error('Failed to decompress screen data:', e);
+              }
             }
             break;
           case 'sessionList':
@@ -153,6 +176,15 @@ export function useWebSocket({
     }
   }, []);
 
+  const killSession = useCallback((sessionId: string) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'killSession',
+        session: sessionId,
+      }));
+    }
+  }, []);
+
   useEffect(() => {
     connect();
     return () => {
@@ -167,5 +199,6 @@ export function useWebSocket({
     refreshSessions,
     createSession,
     sendResize,
+    killSession,
   };
 }

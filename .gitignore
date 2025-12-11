@@ -34,3 +34,6 @@ build/
 # Environment
 .env
 .env.local
+
+# Backup (contains sensitive tokens)
+.backup/
