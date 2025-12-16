@@ -1,0 +1,13 @@
+# Backup directory (contains secrets)
+.backup/
+
+# Maven
+target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Logs
+*.log

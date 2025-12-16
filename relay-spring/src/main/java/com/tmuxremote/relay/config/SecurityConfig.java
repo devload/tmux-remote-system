@@ -43,6 +43,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/oauth2/**").permitAll()
                 .requestMatchers("/login/**").permitAll()
+                // Game AI endpoints (public, no auth required)
+                .requestMatchers("/api/game/**").permitAll()
                 // WebSocket for host agents (no auth required for agents)
                 .requestMatchers("/ws").permitAll()
                 // Protected endpoints

@@ -38,12 +38,22 @@ app:
     secret: ${JWT_SECRET:tmux-remote-super-secret-key-for-jwt-token-256bits}
     expiration-ms: 86400000  # 24 hours
 
+platform:
+  api:
+    url: ${PLATFORM_API_URL:https://api.sessioncast.io}
+
+gemini:
+  api:
+    key: ${GEMINI_API_KEY:}
+    url: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent
+    timeout-seconds: 30
+
 logging:
   level:
     root: WARN
-    com.tmuxremote: INFO
-    com.tmuxremote.relay.handler: WARN      # Reduce WebSocket handler logging
-    com.tmuxremote.relay.service: INFO
+    com.tmuxremote: DEBUG
+    com.tmuxremote.relay.handler: DEBUG
+    com.tmuxremote.relay.service: DEBUG
     org.springframework.web.socket: WARN
     org.springframework.security: WARN
     org.apache.catalina: WARN

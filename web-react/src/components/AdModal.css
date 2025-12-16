@@ -1,0 +1,182 @@
+.ad-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.ad-modal {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 1px solid #0f3460;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 400px;
+  overflow: hidden;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ad-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid #0f3460;
+}
+
+.ad-modal-label {
+  font-size: 10px;
+  color: #666;
+  letter-spacing: 1px;
+}
+
+.ad-modal-countdown {
+  font-size: 12px;
+  color: #888;
+}
+
+.ad-modal-close {
+  background: none;
+  border: 1px solid #444;
+  color: #aaa;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ad-modal-close:hover {
+  background: #333;
+  color: #fff;
+}
+
+.ad-modal-content {
+  padding: 24px;
+  text-align: center;
+}
+
+/* AdSense container */
+.ad-modal-content .adsbygoogle {
+  margin-bottom: 16px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+}
+
+/* Fallback section shown below AdSense */
+.ad-modal-fallback {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #0f3460;
+}
+
+:root.light .ad-modal-fallback {
+  border-top-color: #dee2e6;
+}
+
+.ad-modal-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.ad-modal-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 8px 0;
+}
+
+.ad-modal-subtitle {
+  font-size: 16px;
+  color: #e94560;
+  margin: 0 0 24px 0;
+}
+
+.ad-modal-features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 24px 0;
+  text-align: left;
+}
+
+.ad-modal-features li {
+  color: #aaa;
+  font-size: 14px;
+  padding: 8px 0;
+  border-bottom: 1px solid #0f3460;
+}
+
+.ad-modal-features li:last-child {
+  border-bottom: none;
+}
+
+.ad-modal-cta {
+  background: linear-gradient(135deg, #e94560 0%, #c23a51 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 14px 32px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.ad-modal-cta:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 16px rgba(233, 69, 96, 0.4);
+}
+
+.ad-modal-note {
+  margin-top: 16px;
+  font-size: 11px;
+  color: #555;
+}
+
+/* Light theme */
+:root.light .ad-modal {
+  background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+  border-color: #dee2e6;
+}
+
+:root.light .ad-modal-header {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: #dee2e6;
+}
+
+:root.light .ad-modal-title {
+  color: #212529;
+}
+
+:root.light .ad-modal-features li {
+  color: #495057;
+  border-color: #dee2e6;
+}
+
+:root.light .ad-modal-note {
+  color: #adb5bd;
+}

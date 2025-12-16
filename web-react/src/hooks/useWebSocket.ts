@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ConnectionStatus, Message, SessionInfo } from '../types';
+import { ConnectionStatus, Message, PlanLimitError, SessionInfo } from '../types';
 import pako from 'pako';
+
+// Decode base64 to UTF-8 string
+function decodeBase64(base64Data: string): string {
+  const binaryString = atob(base64Data);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return new TextDecoder('utf-8').decode(bytes);
+}
 
 // Decompress gzip data from base64
 function decompressGzip(base64Data: string): string {
@@ -10,7 +20,7 @@ function decompressGzip(base64Data: string): string {
     bytes[i] = binaryString.charCodeAt(i);
   }
   const decompressed = pako.ungzip(bytes);
-  return new TextDecoder().decode(decompressed);
+  return new TextDecoder('utf-8').decode(decompressed);
 }
 
 const RECONNECT_BASE_DELAY = 1000;
@@ -22,6 +32,7 @@ interface UseWebSocketOptions {
   onScreen?: (sessionId: string, data: string) => void;
   onSessionList?: (sessions: SessionInfo[]) => void;
   onSessionStatus?: (sessionId: string, status: string) => void;
+  onPlanLimitError?: (error: PlanLimitError) => void;
 }
 
 export function useWebSocket({
@@ -30,6 +41,7 @@ export function useWebSocket({
   onScreen,
   onSessionList,
   onSessionStatus,
+  onPlanLimitError,
 }: UseWebSocketOptions) {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
   const wsRef = useRef<WebSocket | null>(null);
@@ -38,6 +50,10 @@ export function useWebSocket({
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    if (!url) {
+      console.log('WebSocket URL not yet available, waiting...');
+      return;
+    }
 
     setStatus('connecting');
     // Add token as query parameter for authentication
@@ -67,7 +83,12 @@ export function useWebSocket({
         switch (message.type) {
           case 'screen':
             if (message.session && message.payload) {
-              onScreen?.(message.session, message.payload);
+              try {
+                const decoded = decodeBase64(message.payload);
+                onScreen?.(message.session, decoded);
+              } catch (e) {
+                console.error('Failed to decode screen data:', e);
+              }
             }
             break;
           case 'screenGz':
@@ -91,6 +112,19 @@ export function useWebSocket({
               onSessionStatus?.(message.session, message.status);
             }
             break;
+          case 'error':
+            if (message.meta?.code === 'PLAN_LIMIT_EXCEEDED') {
+              console.warn('Plan limit exceeded:', message.meta);
+              onPlanLimitError?.({
+                code: 'PLAN_LIMIT_EXCEEDED',
+                messageKo: message.meta.messageKo || '세션 제한에 도달했습니다.',
+                messageEn: message.meta.messageEn || 'Session limit reached.',
+                upgradeUrl: message.meta.upgradeUrl || 'https://sessioncast.io/pricing',
+              });
+            } else {
+              console.error('Server error:', message.meta);
+            }
+            break;
         }
       } catch (e) {
         console.error('Failed to parse message:', e);
@@ -109,7 +143,7 @@ export function useWebSocket({
     };
 
     wsRef.current = ws;
-  }, [url, token, onScreen, onSessionList, onSessionStatus]);
+  }, [url, token, onScreen, onSessionList, onSessionStatus, onPlanLimitError]);
 
   const scheduleReconnect = useCallback(() => {
     const attempts = reconnectAttempts.current++;

@@ -1,0 +1,24 @@
+# Test Server Agent Configuration
+machineId: test-server
+
+# Test relay server
+relay: ws://localhost:8080/ws
+
+# Agent token (get from SessionCast web UI)
+token: agt_YOUR_TEST_TOKEN_HERE
+
+# API Configuration
+api:
+  enabled: true
+  agentId: "YOUR_TEST_AGENT_UUID"
+
+  exec:
+    enabled: true
+    shell: /bin/bash
+    defaultTimeout: 30000
+
+  llm:
+    enabled: true
+    provider: ollama
+    baseUrl: http://localhost:11434
+    model: llama2

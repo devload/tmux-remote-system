@@ -22,6 +22,10 @@ public class SessionInfo {
     private WebSocketSession hostSession;
     private Set<WebSocketSession> viewers;
 
+    // Cache last screen data for instant display when viewer joins
+    private String lastScreen;
+    private String lastScreenType;  // "screen" or "screenGz"
+
     public static SessionInfo create(String id, String label, String machineId, String ownerEmail, WebSocketSession hostSession) {
         return SessionInfo.builder()
                 .id(id)

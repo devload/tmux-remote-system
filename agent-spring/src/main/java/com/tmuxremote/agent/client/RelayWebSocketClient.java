@@ -65,7 +65,9 @@ public class RelayWebSocketClient extends WebSocketClient {
             Message msg = objectMapper.readValue(message, Message.class);
             log.debug("Received message: type={}", msg.getType());
 
-            if ("keys".equals(msg.getType()) && sessionConfig.getId().equals(msg.getSession())) {
+            if ("error".equals(msg.getType())) {
+                handleError(msg);
+            } else if ("keys".equals(msg.getType()) && sessionConfig.getId().equals(msg.getSession())) {
                 String keys = msg.getPayload();
                 if (keys != null && onKeysReceived != null) {
                     onKeysReceived.accept(keys);
@@ -99,6 +101,41 @@ public class RelayWebSocketClient extends WebSocketClient {
             }
         } catch (Exception e) {
             log.error("Failed to process message", e);
+        }
+    }
+
+    private void handleError(Message msg) {
+        Map<String, String> meta = msg.getMeta();
+        if (meta == null) {
+            log.error("Received error without details");
+            return;
+        }
+
+        String code = meta.get("code");
+        String messageEn = meta.get("messageEn");
+        String messageKo = meta.get("messageKo");
+
+        if ("LIMIT_EXCEEDED".equals(code)) {
+            String resource = meta.get("resource");
+            String current = meta.get("current");
+            String max = meta.get("max");
+            String upgradeUrl = meta.get("upgradeUrl");
+
+            log.error("============================================================");
+            log.error("SESSION LIMIT EXCEEDED");
+            log.error("============================================================");
+            log.error("Resource: {}", resource);
+            log.error("Current: {}, Max: {}", current, max);
+            log.error("Message: {}", messageEn);
+            log.error("한국어: {}", messageKo);
+            log.error("Upgrade at: {}", upgradeUrl);
+            log.error("============================================================");
+
+            // Stop reconnection attempts and exit
+            scheduler.shutdownNow();
+            System.exit(1);
+        } else {
+            log.error("Received error: code={}, message={}", code, messageEn);
         }
     }
 

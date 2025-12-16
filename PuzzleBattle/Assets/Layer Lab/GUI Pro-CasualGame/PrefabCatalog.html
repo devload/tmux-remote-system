@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GUI PRO Kit - Casual Game | Prefab Catalog</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            padding: 40px 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            margin-bottom: 40px;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            background: linear-gradient(90deg, #00d4ff, #7c3aed);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            color: #888;
+            font-size: 1.1em;
+        }
+
+        .nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 40px;
+            padding: 20px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 15px;
+        }
+
+        .nav a {
+            padding: 10px 20px;
+            background: rgba(124, 58, 237, 0.3);
+            color: #fff;
+            text-decoration: none;
+            border-radius: 25px;
+            transition: all 0.3s;
+            font-size: 0.9em;
+        }
+
+        .nav a:hover {
+            background: rgba(124, 58, 237, 0.6);
+            transform: translateY(-2px);
+        }
+
+        section {
+            margin-bottom: 60px;
+        }
+
+        section h2 {
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            padding: 15px 25px;
+            background: linear-gradient(90deg, rgba(124, 58, 237, 0.4), transparent);
+            border-left: 4px solid #7c3aed;
+            border-radius: 0 10px 10px 0;
+        }
+
+        section h2 span {
+            font-size: 0.6em;
+            color: #888;
+            margin-left: 15px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 25px;
+        }
+
+        .card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            overflow: hidden;
+            transition: all 0.3s;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            border-color: rgba(124, 58, 237, 0.5);
+        }
+
+        .card img {
+            width: 100%;
+            height: 400px;
+            object-fit: contain;
+            background: #0d0d1a;
+            padding: 10px;
+        }
+
+        .card-info {
+            padding: 20px;
+        }
+
+        .card-info h3 {
+            font-size: 1.1em;
+            margin-bottom: 8px;
+            color: #00d4ff;
+        }
+
+        .card-info p {
+            font-size: 0.85em;
+            color: #888;
+            line-height: 1.5;
+        }
+
+        .card-info .prefab-name {
+            font-family: monospace;
+            background: rgba(0,0,0,0.3);
+            padding: 8px 12px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-size: 0.8em;
+            color: #7c3aed;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 4px 10px;
+            background: rgba(0, 212, 255, 0.2);
+            color: #00d4ff;
+            border-radius: 12px;
+            font-size: 0.75em;
+            margin-right: 5px;
+            margin-top: 8px;
+        }
+
+        .tag.recommended {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+
+        .component-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
+            gap: 25px;
+        }
+
+        .component-card img {
+            height: auto;
+            max-height: 600px;
+        }
+
+        .summary-box {
+            background: rgba(124, 58, 237, 0.1);
+            border: 1px solid rgba(124, 58, 237, 0.3);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 40px;
+        }
+
+        .summary-box h3 {
+            color: #7c3aed;
+            margin-bottom: 15px;
+        }
+
+        .summary-box ul {
+            list-style: none;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+        }
+
+        .summary-box li {
+            padding: 8px 15px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            font-size: 0.9em;
+        }
+
+        .summary-box li strong {
+            color: #00d4ff;
+        }
+
+        footer {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            margin-top: 60px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>GUI PRO Kit - Casual Game</h1>
+            <p>Unity UI Asset Prefab Catalog for PuzzleBattle</p>
+        </header>
+
+        <nav class="nav">
+            <a href="#screens">화면 패널</a>
+            <a href="#play">게임 플레이</a>
+            <a href="#popups">팝업</a>
+            <a href="#shop">상점/랭킹</a>
+            <a href="#character">캐릭터</a>
+            <a href="#components">컴포넌트</a>
+            <a href="#icons">아이콘</a>
+        </nav>
+
+        <div class="summary-box">
+            <h3>퍼즐 게임 추천 구성</h3>
+            <ul>
+                <li><strong>Login:</strong> Title.prefab</li>
+                <li><strong>Main:</strong> Lobby.prefab</li>
+                <li><strong>Game:</strong> Play_Type1.prefab</li>
+                <li><strong>Result:</strong> Play_Result.prefab</li>
+                <li><strong>Ranking:</strong> Ranking.prefab</li>
+                <li><strong>Shop:</strong> Shop.prefab</li>
+                <li><strong>Settings:</strong> Popup_Setting.prefab</li>
+                <li><strong>Missions:</strong> Missions.prefab</li>
+            </ul>
+        </div>
+
+        <!-- 메인 화면 섹션 -->
+        <section id="screens">
+            <h2>메인 화면 <span>Main Screens</span></h2>
+            <div class="grid">
+                <div class="card">
+                    <img src="Preview/Title.png" alt="Title">
+                    <div class="card-info">
+                        <h3>Title (타이틀/스플래시)</h3>
+                        <p>앱 시작 시 보여지는 타이틀 화면. 게임 로고와 TAP TO START 포함.</p>
+                        <span class="tag recommended">추천: 로그인 화면</span>
+                        <div class="prefab-name">Title.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Title_Loadingbar.png" alt="Title Loadingbar">
+                    <div class="card-info">
+                        <h3>Title with Loading Bar</h3>
+                        <p>로딩바가 포함된 타이틀 화면. 리소스 로딩 시 사용.</p>
+                        <span class="tag">대체 옵션</span>
+                        <div class="prefab-name">Title_LoadingBar.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Lobby.png" alt="Lobby">
+                    <div class="card-info">
+                        <h3>Lobby (메인 로비)</h3>
+                        <p>메인 로비 화면. 하단 탭바, 상단 리소스바, 유저 정보 포함. 게임의 중심 허브.</p>
+                        <span class="tag recommended">추천: 메인 화면</span>
+                        <span class="tag">탭바 포함</span>
+                        <div class="prefab-name">Lobby.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Loading.png" alt="Loading">
+                    <div class="card-info">
+                        <h3>Loading (로딩)</h3>
+                        <p>전체 화면 로딩. 캐릭터와 팁 텍스트 포함.</p>
+                        <span class="tag">로딩 화면</span>
+                        <div class="prefab-name">Loading.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/LockScreen.png" alt="LockScreen">
+                    <div class="card-info">
+                        <h3>Lock Screen (잠금)</h3>
+                        <p>게임 잠금 화면. 레벨 제한 등에 사용.</p>
+                        <span class="tag">잠금</span>
+                        <div class="prefab-name">LockScreen.prefab</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 게임 플레이 섹션 -->
+        <section id="play">
+            <h2>게임 플레이 <span>Gameplay Screens</span></h2>
+            <div class="grid">
+                <div class="card">
+                    <img src="Preview/Play_Type1.png" alt="Play Type1">
+                    <div class="card-info">
+                        <h3>Play Type 1</h3>
+                        <p>게임 플레이 화면. 상단 스테이지 정보, 중앙 게임 영역, 하단 버튼.</p>
+                        <span class="tag recommended">추천: 게임 화면</span>
+                        <div class="prefab-name">Play_Type1.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Play_Type2.png" alt="Play Type2">
+                    <div class="card-info">
+                        <h3>Play Type 2</h3>
+                        <p>다른 스타일의 게임 플레이 화면.</p>
+                        <span class="tag">대체 옵션</span>
+                        <div class="prefab-name">Play_Type2.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Play_TypeText.png" alt="Play TypeText">
+                    <div class="card-info">
+                        <h3>Play Type Text</h3>
+                        <p>텍스트 중심 게임 화면. 퀴즈나 단어 게임에 적합.</p>
+                        <span class="tag">텍스트 게임용</span>
+                        <div class="prefab-name">Play_TypeText.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Play_BattleVS.png" alt="Play BattleVS">
+                    <div class="card-info">
+                        <h3>Play Battle VS</h3>
+                        <p>1:1 대전 화면. 양쪽 플레이어 정보 표시.</p>
+                        <span class="tag">대전 모드</span>
+                        <div class="prefab-name">Play_BattleVS.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Play_Pause.png" alt="Play Pause">
+                    <div class="card-info">
+                        <h3>Play Pause (일시정지)</h3>
+                        <p>게임 일시정지 팝업. 계속, 재시작, 나가기 버튼.</p>
+                        <span class="tag">일시정지</span>
+                        <div class="prefab-name">Play_Pause.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Play_Continue.png" alt="Play Continue">
+                    <div class="card-info">
+                        <h3>Play Continue (계속하기)</h3>
+                        <p>게임 오버 후 계속하기 팝업. 광고 보기, 젬 사용 등.</p>
+                        <span class="tag">계속하기</span>
+                        <div class="prefab-name">Play_Continue.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Play_Result.png" alt="Play Result">
+                    <div class="card-info">
+                        <h3>Play Result (결과)</h3>
+                        <p>게임 결과 화면. 점수, 별, 보상 표시.</p>
+                        <span class="tag recommended">추천: 결과 화면</span>
+                        <div class="prefab-name">Play_Result.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Stage_Select_Type1.png" alt="Stage Select Type1">
+                    <div class="card-info">
+                        <h3>Stage Select Type 1</h3>
+                        <p>스테이지 선택 화면. 레벨 버튼 그리드.</p>
+                        <span class="tag">스테이지 선택</span>
+                        <div class="prefab-name">Stage_Select_Type1.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Stage_Select_Type2_Detail.png" alt="Stage Select Type2 Detail">
+                    <div class="card-info">
+                        <h3>Stage Select Type 2 Detail</h3>
+                        <p>상세 스테이지 선택. 챕터별 구분.</p>
+                        <span class="tag">스테이지 선택</span>
+                        <div class="prefab-name">Stage_Select_Type2.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/LevelUp.png" alt="LevelUp">
+                    <div class="card-info">
+                        <h3>Level Up</h3>
+                        <p>레벨업 축하 화면. 보상 표시.</p>
+                        <span class="tag">레벨업</span>
+                        <div class="prefab-name">LevelUp.prefab</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 팝업 섹션 -->
+        <section id="popups">
+            <h2>팝업 <span>Popups</span></h2>
+            <div class="grid">
+                <div class="card">
+                    <img src="Preview/Popup_Login.png" alt="Popup Login">
+                    <div class="card-info">
+                        <h3>Login Popup</h3>
+                        <p>로그인 팝업. 소셜 로그인 버튼 포함.</p>
+                        <span class="tag">로그인</span>
+                        <div class="prefab-name">Popup_Login.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Popup_Signup.png" alt="Popup Signup">
+                    <div class="card-info">
+                        <h3>Signup Popup</h3>
+                        <p>회원가입 팝업. 입력 필드 포함.</p>
+                        <span class="tag">회원가입</span>
+                        <div class="prefab-name">Popup_Signup.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Popup_Setting.png" alt="Popup Setting">
+                    <div class="card-info">
+                        <h3>Settings Popup</h3>
+                        <p>설정 팝업. 사운드, 진동, 알림 토글.</p>
+                        <span class="tag recommended">추천: 설정</span>
+                        <div class="prefab-name">Popup_Setting.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Popup_Setting_Language.png" alt="Popup Setting Language">
+                    <div class="card-info">
+                        <h3>Language Setting</h3>
+                        <p>언어 선택 팝업.</p>
+                        <span class="tag">언어 설정</span>
+                        <div class="prefab-name">Popup_Setting_Language.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Popup_RewardGet.png" alt="Popup RewardGet">
+                    <div class="card-info">
+                        <h3>Reward Get</h3>
+                        <p>보상 획득 팝업.</p>
+                        <span class="tag">보상</span>
+                        <div class="prefab-name">Popup_RewardGet.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Popup_RewardWeek.png" alt="Popup RewardWeek">
+                    <div class="card-info">
+                        <h3>Weekly Reward</h3>
+                        <p>주간 출석 보상. 7일 보상 표시.</p>
+                        <span class="tag">출석 보상</span>
+                        <div class="prefab-name">Popup_RewardWeek.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Popup_RewardMonth.png" alt="Popup RewardMonth">
+                    <div class="card-info">
+                        <h3>Monthly Reward</h3>
+                        <p>월간 출석 보상. 캘린더 형식.</p>
+                        <span class="tag">출석 보상</span>
+                        <div class="prefab-name">Popup_RewardMonth.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Popup_Offline.png" alt="Popup Offline">
+                    <div class="card-info">
+                        <h3>Offline Reward</h3>
+                        <p>오프라인 보상 팝업.</p>
+                        <span class="tag">오프라인 보상</span>
+                        <div class="prefab-name">Popup_Offline.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Popup_Name.png" alt="Popup Name">
+                    <div class="card-info">
+                        <h3>Name Input</h3>
+                        <p>이름 입력 팝업.</p>
+                        <span class="tag">입력</span>
+                        <div class="prefab-name">Popup_Name.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Popup_ChangeName.png" alt="Popup ChangeName">
+                    <div class="card-info">
+                        <h3>Change Name</h3>
+                        <p>이름 변경 팝업.</p>
+                        <span class="tag">입력</span>
+                        <div class="prefab-name">Popup_ChangeName.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Popup_UserInfo.png" alt="Popup UserInfo">
+                    <div class="card-info">
+                        <h3>User Info</h3>
+                        <p>유저 정보 팝업.</p>
+                        <span class="tag">유저 정보</span>
+                        <div class="prefab-name">Popup_UserInfo.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Popup_Inbox.png" alt="Popup Inbox">
+                    <div class="card-info">
+                        <h3>Inbox</h3>
+                        <p>받은 편지함. 보상 수령.</p>
+                        <span class="tag">편지함</span>
+                        <div class="prefab-name">Popup_Inbox.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Popup_Checking.png" alt="Popup Checking">
+                    <div class="card-info">
+                        <h3>Checking</h3>
+                        <p>확인 팝업. 예/아니오 선택.</p>
+                        <span class="tag">확인</span>
+                        <div class="prefab-name">Popup_Checking.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Popup_Subscribe.png" alt="Popup Subscribe">
+                    <div class="card-info">
+                        <h3>Subscribe</h3>
+                        <p>구독 상품 팝업.</p>
+                        <span class="tag">구독</span>
+                        <div class="prefab-name">Popup_Subscribe.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Popup_Pass.png" alt="Popup Pass">
+                    <div class="card-info">
+                        <h3>Pass</h3>
+                        <p>시즌패스 구매 팝업.</p>
+                        <span class="tag">시즌패스</span>
+                        <div class="prefab-name">Popup_Pass.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Popup_Update.png" alt="Popup Update">
+                    <div class="card-info">
+                        <h3>Update</h3>
+                        <p>업데이트 알림 팝업.</p>
+                        <span class="tag">시스템</span>
+                        <div class="prefab-name">Popup_Update.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Popup_EUALPrivacy.png" alt="Popup EUALPrivacy">
+                    <div class="card-info">
+                        <h3>EULA & Privacy</h3>
+                        <p>이용약관 및 개인정보 동의.</p>
+                        <span class="tag">약관</span>
+                        <div class="prefab-name">Popup_EUALPrivacy.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/ErrorNetwork.png" alt="ErrorNetwork">
+                    <div class="card-info">
+                        <h3>Network Error</h3>
+                        <p>네트워크 에러 팝업.</p>
+                        <span class="tag">에러</span>
+                        <div class="prefab-name">ErrorNetwork.prefab</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 상점/랭킹 섹션 -->
+        <section id="shop">
+            <h2>상점 & 랭킹 <span>Shop & Ranking</span></h2>
+            <div class="grid">
+                <div class="card">
+                    <img src="Preview/Shop.png" alt="Shop">
+                    <div class="card-info">
+                        <h3>Shop</h3>
+                        <p>상점 화면. 탭으로 카테고리 분류.</p>
+                        <span class="tag recommended">추천: 상점</span>
+                        <div class="prefab-name">Shop.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Shop1.png" alt="Shop1">
+                    <div class="card-info">
+                        <h3>Shop Style 1</h3>
+                        <p>상점 스타일 1.</p>
+                        <span class="tag">상점</span>
+                        <div class="prefab-name">Shop.prefab (탭1)</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Shop2.png" alt="Shop2">
+                    <div class="card-info">
+                        <h3>Shop Style 2</h3>
+                        <p>상점 스타일 2.</p>
+                        <span class="tag">상점</span>
+                        <div class="prefab-name">Shop.prefab (탭2)</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Ranking.png" alt="Ranking">
+                    <div class="card-info">
+                        <h3>Ranking</h3>
+                        <p>랭킹 화면. 순위 리스트.</p>
+                        <span class="tag recommended">추천: 랭킹</span>
+                        <div class="prefab-name">Ranking.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Missions.png" alt="Missions">
+                    <div class="card-info">
+                        <h3>Missions</h3>
+                        <p>미션 목록. 일일/주간 미션.</p>
+                        <span class="tag recommended">추천: 미션</span>
+                        <div class="prefab-name">Missions.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Pass.png" alt="Pass">
+                    <div class="card-info">
+                        <h3>Season Pass</h3>
+                        <p>시즌패스 화면. 무료/프리미엄 보상.</p>
+                        <span class="tag">시즌패스</span>
+                        <div class="prefab-name">Pass.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/ADRemove.png" alt="ADRemove">
+                    <div class="card-info">
+                        <h3>Ad Remove</h3>
+                        <p>광고 제거 구매.</p>
+                        <span class="tag">광고 제거</span>
+                        <div class="prefab-name">Ad_Remove.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Roulette.png" alt="Roulette">
+                    <div class="card-info">
+                        <h3>Roulette</h3>
+                        <p>룰렛 이벤트.</p>
+                        <span class="tag">이벤트</span>
+                        <div class="prefab-name">Roulette.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Rate.png" alt="Rate">
+                    <div class="card-info">
+                        <h3>Rate App</h3>
+                        <p>앱 평가 요청 팝업.</p>
+                        <span class="tag">평가</span>
+                        <div class="prefab-name">Rate.prefab</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 캐릭터 섹션 -->
+        <section id="character">
+            <h2>캐릭터 & 장비 <span>Character & Equipment</span></h2>
+            <div class="grid">
+                <div class="card">
+                    <img src="Preview/Character.png" alt="Character">
+                    <div class="card-info">
+                        <h3>Character Detail</h3>
+                        <p>캐릭터 상세 화면. 스탯, 스킬 표시.</p>
+                        <span class="tag">캐릭터</span>
+                        <div class="prefab-name">Character.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Character_List.png" alt="Character List">
+                    <div class="card-info">
+                        <h3>Character List</h3>
+                        <p>캐릭터 목록. 그리드 형식.</p>
+                        <span class="tag">캐릭터</span>
+                        <div class="prefab-name">Character_List.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Character_Select.png" alt="Character Select">
+                    <div class="card-info">
+                        <h3>Character Select</h3>
+                        <p>캐릭터 선택 화면.</p>
+                        <span class="tag">캐릭터</span>
+                        <div class="prefab-name">Character_Select.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Character_SuperPassive.png" alt="Character SuperPassive">
+                    <div class="card-info">
+                        <h3>Super Passive</h3>
+                        <p>슈퍼 패시브 스킬.</p>
+                        <span class="tag">스킬</span>
+                        <div class="prefab-name">Character_SuperPassive.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Equipment.png" alt="Equipment">
+                    <div class="card-info">
+                        <h3>Equipment</h3>
+                        <p>장비 화면. 장착 슬롯.</p>
+                        <span class="tag">장비</span>
+                        <div class="prefab-name">Equipment.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Equipment_Popup_Detail1.png" alt="Equipment Popup Detail1">
+                    <div class="card-info">
+                        <h3>Equipment Detail 1</h3>
+                        <p>장비 상세 팝업.</p>
+                        <span class="tag">장비</span>
+                        <div class="prefab-name">Equipment_Popup_Detail1.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Equipment_Popup_Detail2.png" alt="Equipment Popup Detail2">
+                    <div class="card-info">
+                        <h3>Equipment Detail 2</h3>
+                        <p>장비 상세 팝업 (다른 스타일).</p>
+                        <span class="tag">장비</span>
+                        <div class="prefab-name">Equipment_Popup_Detail2.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Equipment_Popup_AddSlot.png" alt="Equipment Popup AddSlot">
+                    <div class="card-info">
+                        <h3>Add Equipment Slot</h3>
+                        <p>장비 슬롯 추가.</p>
+                        <span class="tag">장비</span>
+                        <div class="prefab-name">Equipment_Popup_AddSlot.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Inventory.png" alt="Inventory">
+                    <div class="card-info">
+                        <h3>Inventory</h3>
+                        <p>인벤토리 화면.</p>
+                        <span class="tag">인벤토리</span>
+                        <div class="prefab-name">Inventory.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/RuneFuse.png" alt="RuneFuse">
+                    <div class="card-info">
+                        <h3>Rune Fuse</h3>
+                        <p>룬 합성 화면.</p>
+                        <span class="tag">합성</span>
+                        <div class="prefab-name">RuneFuse.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Chat.png" alt="Chat">
+                    <div class="card-info">
+                        <h3>Chat</h3>
+                        <p>채팅 화면.</p>
+                        <span class="tag">소셜</span>
+                        <div class="prefab-name">Chat.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Clan.png" alt="Clan">
+                    <div class="card-info">
+                        <h3>Clan</h3>
+                        <p>클랜 화면.</p>
+                        <span class="tag">소셜</span>
+                        <div class="prefab-name">Clan.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Tutorial_Hand.png" alt="Tutorial Hand">
+                    <div class="card-info">
+                        <h3>Tutorial Hand</h3>
+                        <p>튜토리얼 손가락 안내.</p>
+                        <span class="tag">튜토리얼</span>
+                        <div class="prefab-name">Tutorial_Hand.prefab</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/Tutorial_Character.png" alt="Tutorial Character">
+                    <div class="card-info">
+                        <h3>Tutorial Character</h3>
+                        <p>튜토리얼 캐릭터 안내.</p>
+                        <span class="tag">튜토리얼</span>
+                        <div class="prefab-name">Tutorial_Character.prefab</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 컴포넌트 섹션 -->
+        <section id="components">
+            <h2>UI 컴포넌트 <span>UI Components</span></h2>
+            <div class="component-grid">
+                <div class="card">
+                    <img src="Preview/_Component_1.png" alt="Component 1">
+                    <div class="card-info">
+                        <h3>Buttons & Basic Elements</h3>
+                        <p>다양한 버튼, 토글, 입력 필드, 슬라이더 등 기본 UI 요소.</p>
+                        <span class="tag">버튼</span>
+                        <span class="tag">토글</span>
+                        <span class="tag">입력</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/_Component_2.png" alt="Component 2">
+                    <div class="card-info">
+                        <h3>Frames & Panels</h3>
+                        <p>다양한 프레임, 패널, 카드 레이아웃.</p>
+                        <span class="tag">프레임</span>
+                        <span class="tag">패널</span>
+                        <span class="tag">카드</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/_Component_3.png" alt="Component 3">
+                    <div class="card-info">
+                        <h3>Labels & Titles</h3>
+                        <p>라벨, 타이틀, 리본, 배너 등 장식 요소.</p>
+                        <span class="tag">라벨</span>
+                        <span class="tag">타이틀</span>
+                        <span class="tag">리본</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/_Component_4.png" alt="Component 4">
+                    <div class="card-info">
+                        <h3>Progress Bars & Sliders</h3>
+                        <p>다양한 스타일의 프로그레스바, 슬라이더, 레벨바.</p>
+                        <span class="tag">프로그레스</span>
+                        <span class="tag">슬라이더</span>
+                        <span class="tag">레벨바</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/_Component_5.png" alt="Component 5">
+                    <div class="card-info">
+                        <h3>Popups & Dialogs</h3>
+                        <p>팝업, 다이얼로그, 토스트 메시지 템플릿.</p>
+                        <span class="tag">팝업</span>
+                        <span class="tag">다이얼로그</span>
+                        <span class="tag">토스트</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 아이콘 섹션 -->
+        <section id="icons">
+            <h2>아이콘 <span>Icons</span></h2>
+            <div class="component-grid">
+                <div class="card">
+                    <img src="Preview/_PictoIcons.png" alt="Picto Icons">
+                    <div class="card-info">
+                        <h3>Pictogram Icons (320+)</h3>
+                        <p>다양한 픽토그램 아이콘. 설정, 메뉴, 액션 등.</p>
+                        <span class="tag">320+ 아이콘</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/_ItemIcons.png" alt="Item Icons">
+                    <div class="card-info">
+                        <h3>Item Icons (80+)</h3>
+                        <p>게임 아이템 아이콘. 무기, 방어구, 소비 아이템 등.</p>
+                        <span class="tag">80+ 아이콘</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <img src="Preview/_RuneIcons.png" alt="Rune Icons">
+                    <div class="card-info">
+                        <h3>Rune Icons</h3>
+                        <p>룬/마법 아이콘.</p>
+                        <span class="tag">룬 아이콘</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <p>GUI PRO Kit - Casual Game by LAYERLAB</p>
+            <p>Prefab Catalog for PuzzleBattle Project</p>
+        </footer>
+    </div>
+</body>
+</html>

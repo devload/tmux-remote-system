@@ -11,6 +11,7 @@ interface TerminalProps {
   connectionStatus: string;
   onInput: (data: string) => void;
   onResize?: (cols: number, rows: number) => void;
+  onRefresh?: () => void;
   theme: 'dark' | 'light';
 }
 
@@ -37,8 +38,13 @@ export function Terminal({
   connectionStatus,
   onInput,
   onResize,
+  onRefresh,
   theme
 }: TerminalProps) {
+  // Detect iOS Safari
+  const isIOSSafari = /iPad|iPhone|iPod/.test(navigator.userAgent) &&
+    !('MSStream' in window) &&
+    /Safari/.test(navigator.userAgent);
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -64,14 +70,18 @@ export function Terminal({
     const initTimer = setTimeout(() => {
       if (!terminalRef.current) return;
 
+      // Detect mobile for adjusted settings
+      const isMobile = window.innerWidth <= 768;
+
       const xterm = new XTerm({
         cursorBlink: true,
-        fontSize: 14,
+        fontSize: isMobile ? 12 : 14,
         fontFamily: 'Menlo, Monaco, "Courier New", monospace',
         rows: 24,
         cols: 80,
-        scrollback: 1000,
+        scrollback: 5000,
         theme: theme === 'light' ? lightTheme : darkTheme,
+        allowProposedApi: true,
       });
 
       const fitAddon = new FitAddon();
@@ -103,30 +113,65 @@ export function Terminal({
     return () => clearTimeout(initTimer);
   }, [sessionId, onInput]);
 
-  // Handle window resize
+  // Handle window resize with debounce to prevent duplicate content on mobile scroll
   useEffect(() => {
     if (!isReady) return;
 
+    let resizeTimeout: ReturnType<typeof setTimeout> | null = null;
+    let lastCols = 0;
+    let lastRows = 0;
+
     const handleResize = () => {
-      if (fitAddonRef.current && xtermRef.current) {
-        try {
-          fitAddonRef.current.fit();
-          // Send new size to server
-          const cols = xtermRef.current.cols;
-          const rows = xtermRef.current.rows;
-          if (onResize && cols > 0 && rows > 0) {
-            onResize(cols, rows);
-          }
-        } catch (e) {
-          // ignore
-        }
+      // Clear previous timeout to debounce rapid resize events
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
       }
+
+      resizeTimeout = setTimeout(() => {
+        if (fitAddonRef.current && xtermRef.current) {
+          try {
+            fitAddonRef.current.fit();
+            const cols = xtermRef.current.cols;
+            const rows = xtermRef.current.rows;
+
+            // Only send resize if dimensions actually changed
+            if (onResize && cols > 0 && rows > 0 && (cols !== lastCols || rows !== lastRows)) {
+              lastCols = cols;
+              lastRows = rows;
+              // Clear terminal before receiving new screen data to prevent duplication
+              xtermRef.current.clear();
+              onResize(cols, rows);
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
+      }, 150); // 150ms debounce
     };
 
     window.addEventListener('resize', handleResize);
-    // Trigger initial resize
-    handleResize();
-    return () => window.removeEventListener('resize', handleResize);
+    // Trigger initial resize (no debounce for initial)
+    if (fitAddonRef.current && xtermRef.current) {
+      try {
+        fitAddonRef.current.fit();
+        const cols = xtermRef.current.cols;
+        const rows = xtermRef.current.rows;
+        if (onResize && cols > 0 && rows > 0) {
+          lastCols = cols;
+          lastRows = rows;
+          onResize(cols, rows);
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout);
+      }
+    };
   }, [isReady, onResize]);
 
   // Handle theme change
@@ -139,16 +184,10 @@ export function Terminal({
   const writeToTerminal = useCallback((data: string) => {
     if (xtermRef.current && isReady) {
       try {
-        // Decode base64 to UTF-8 properly
-        const binaryString = atob(data);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-        const decoded = new TextDecoder('utf-8').decode(bytes);
-        xtermRef.current.write(decoded);
+        // Data is already decoded (UTF-8 string) from useWebSocket
+        xtermRef.current.write(data);
       } catch (e) {
-        console.error('Failed to decode/write:', e);
+        console.error('Failed to write to terminal:', e);
       }
     }
   }, [isReady]);
@@ -159,6 +198,61 @@ export function Terminal({
       delete (window as any).__writeToTerminal;
     };
   }, [writeToTerminal]);
+
+  // Handle terminal refresh - clears screen and requests new data
+  const handleRefresh = useCallback(() => {
+    if (xtermRef.current && isReady) {
+      // Clear the terminal buffer
+      xtermRef.current.clear();
+      xtermRef.current.reset();
+
+      // Re-fit to get correct dimensions
+      if (fitAddonRef.current) {
+        try {
+          fitAddonRef.current.fit();
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      // Request fresh screen data
+      if (onRefresh) {
+        onRefresh();
+      } else if (onResize && xtermRef.current) {
+        // Fallback: trigger resize to get fresh data
+        const cols = xtermRef.current.cols;
+        const rows = xtermRef.current.rows;
+        if (cols > 0 && rows > 0) {
+          onResize(cols, rows);
+        }
+      }
+    }
+  }, [isReady, onRefresh, onResize]);
+
+  // iOS Safari: Handle visibility change to fix rendering issues
+  useEffect(() => {
+    if (!isIOSSafari || !isReady) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && xtermRef.current && fitAddonRef.current) {
+        // Re-fit and refresh on returning to tab
+        setTimeout(() => {
+          if (fitAddonRef.current) {
+            try {
+              fitAddonRef.current.fit();
+            } catch (e) {
+              // ignore
+            }
+          }
+        }, 100);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isIOSSafari, isReady]);
 
   return (
     <div className="terminal-container">
@@ -171,9 +265,21 @@ export function Terminal({
         </div>
         <div className="header-right">
           {sessionId && (
-            <span className={`session-status ${status}`}>
-              {status === 'online' ? 'Connected' : 'Disconnected'}
-            </span>
+            <>
+              <button
+                className="terminal-refresh-btn"
+                onClick={handleRefresh}
+                title="Refresh terminal"
+                aria-label="Refresh terminal"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16" />
+                </svg>
+              </button>
+              <span className={`session-status ${status}`}>
+                {status === 'online' ? 'Connected' : 'Disconnected'}
+              </span>
+            </>
           )}
         </div>
       </div>

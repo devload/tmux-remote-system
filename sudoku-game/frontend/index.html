@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sudoku Battle</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            color: #fff;
+        }
+
+        /* Profile Setup Screen */
+        .profile-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .profile-screen.hidden {
+            display: none;
+        }
+
+        .profile-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #5e81f4 0%, #7c3aed 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .profile-subtitle {
+            color: #888;
+            margin-bottom: 30px;
+        }
+
+        .profile-form {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            width: 100%;
+            max-width: 420px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.9rem;
+            color: #aaa;
+            margin-bottom: 10px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #fff;
+            font-size: 1rem;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .form-input:focus {
+            border-color: #5e81f4;
+        }
+
+        .form-input.error {
+            border-color: #ff6b6b;
+        }
+
+        .avatar-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 10px;
+        }
+
+        .avatar-option {
+            aspect-ratio: 1;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid transparent;
+        }
+
+        .avatar-option:hover {
+            transform: scale(1.1);
+        }
+
+        .avatar-option.selected {
+            border-color: #5e81f4;
+            box-shadow: 0 0 20px rgba(94, 129, 244, 0.5);
+        }
+
+        .color-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 10px;
+        }
+
+        .color-option {
+            aspect-ratio: 1;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 3px solid transparent;
+        }
+
+        .color-option:hover {
+            transform: scale(1.1);
+        }
+
+        .color-option.selected {
+            border-color: #fff;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+        }
+
+        .start-btn {
+            width: 100%;
+            padding: 18px;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #5e81f4 0%, #7c3aed 100%);
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+
+        .start-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(94, 129, 244, 0.4);
+        }
+
+        .start-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Game Container */
+        #game-container {
+            position: relative;
+            touch-action: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            max-width: 100%;
+        }
+
+        canvas {
+            border-radius: 20px;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5),
+                        0 0 40px rgba(94, 129, 244, 0.2);
+        }
+
+        .ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+        }
+
+        .ui-overlay > * {
+            pointer-events: auto;
+        }
+
+        .player-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .player-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .player-name {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .stats {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .stat-box {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-box.mistakes {
+            color: #ff6b6b;
+        }
+
+        .ghost-indicator {
+            position: absolute;
+            top: 60px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            pointer-events: none;
+        }
+
+        .ghost-player {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.75rem;
+            opacity: 0.8;
+        }
+
+        .ghost-avatar {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+        }
+
+        .control-btn {
+            background: linear-gradient(135deg, #5e81f4 0%, #7c3aed 100%);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(94, 129, 244, 0.3);
+        }
+
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(94, 129, 244, 0.5);
+        }
+
+        select {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-family: inherit;
+            cursor: pointer;
+            outline: none;
+        }
+
+        select option {
+            background: #1a1a2e;
+            color: white;
+        }
+
+        /* Modals */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 40px;
+            border-radius: 25px;
+            text-align: center;
+            border: 2px solid rgba(94, 129, 244, 0.3);
+            box-shadow: 0 0 60px rgba(94, 129, 244, 0.2);
+            animation: modalPop 0.4s ease;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        @keyframes modalPop {
+            0% { transform: scale(0.5); opacity: 0; }
+            70% { transform: scale(1.05); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-content h2 {
+            font-size: 1.8rem;
+            margin-bottom: 15px;
+            background: linear-gradient(135deg, #5e81f4 0%, #7c3aed 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .modal-content.gameover h2 {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .modal-content p {
+            color: #aaa;
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+
+        .rank-display {
+            font-size: 3rem;
+            font-weight: 700;
+            margin: 20px 0;
+            color: #ffd700;
+        }
+
+        .leaderboard {
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .leaderboard-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            margin-bottom: 8px;
+        }
+
+        .leaderboard-item.me {
+            background: rgba(94, 129, 244, 0.2);
+            border: 1px solid rgba(94, 129, 244, 0.3);
+        }
+
+        .leaderboard-rank {
+            font-weight: 700;
+            width: 30px;
+            text-align: center;
+            color: #5e81f4;
+        }
+
+        .leaderboard-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .leaderboard-name {
+            flex: 1;
+        }
+
+        .leaderboard-time {
+            color: #888;
+        }
+
+        .modal-content .control-btn {
+            margin-top: 20px;
+        }
+
+        /* Game Selection Screen */
+        .game-select-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .game-select-screen.hidden {
+            display: none;
+        }
+
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            max-width: 900px;
+            width: 100%;
+            margin-top: 30px;
+        }
+
+        .game-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 25px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .game-card:hover:not(.coming-soon) {
+            transform: translateY(-5px);
+            border-color: #5e81f4;
+            box-shadow: 0 15px 40px rgba(94, 129, 244, 0.3);
+        }
+
+        .game-card.coming-soon {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .game-icon {
+            font-size: 3rem;
+            width: 70px;
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(94, 129, 244, 0.2);
+            border-radius: 15px;
+        }
+
+        .game-info h3 {
+            font-size: 1.3rem;
+            margin-bottom: 5px;
+        }
+
+        .game-info p {
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        .game-badge {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: linear-gradient(135deg, #5e81f4 0%, #7c3aed 100%);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .game-badge.soon {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Game Intro Screen */
+        .game-intro-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .game-intro-screen.hidden {
+            display: none;
+        }
+
+        .intro-content {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 25px;
+            padding: 35px;
+            max-width: 500px;
+            width: 100%;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .intro-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .intro-icon {
+            font-size: 2.5rem;
+        }
+
+        .intro-header h1 {
+            font-size: 1.8rem;
+            background: linear-gradient(135deg, #5e81f4 0%, #7c3aed 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .intro-rules, .intro-features {
+            margin-bottom: 25px;
+        }
+
+        .intro-rules h2, .intro-features h2 {
+            font-size: 1rem;
+            color: #888;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .rule-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .rule-item:last-child {
+            border-bottom: none;
+        }
+
+        .rule-icon {
+            font-size: 1.2rem;
+            width: 35px;
+            text-align: center;
+        }
+
+        .rule-item p {
+            color: #ddd;
+            font-size: 0.95rem;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+        }
+
+        .feature-icon {
+            font-size: 1.1rem;
+        }
+
+        .feature-item span:last-child {
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+
+        .back-btn {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            background: transparent;
+            color: #888;
+            font-size: 0.95rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+
+        .back-btn:hover {
+            border-color: rgba(255, 255, 255, 0.4);
+            color: #fff;
+        }
+
+        /* Mobile Responsive Styles */
+        @media (max-width: 480px) {
+            .profile-title {
+                font-size: 1.8rem;
+            }
+
+            .profile-subtitle {
+                font-size: 0.9rem;
+                margin-bottom: 20px;
+            }
+
+            .profile-form {
+                padding: 20px;
+                border-radius: 15px;
+            }
+
+            .form-group {
+                margin-bottom: 18px;
+            }
+
+            .avatar-grid {
+                grid-template-columns: repeat(6, 1fr);
+                gap: 6px;
+            }
+
+            .avatar-option {
+                font-size: 1.4rem;
+                border-radius: 8px;
+            }
+
+            .color-grid {
+                grid-template-columns: repeat(6, 1fr);
+                gap: 6px;
+            }
+
+            .start-btn {
+                padding: 14px;
+                font-size: 1rem;
+            }
+
+            /* Game Select Mobile */
+            .game-grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .game-card {
+                padding: 18px;
+            }
+
+            .game-icon {
+                font-size: 2.2rem;
+                width: 55px;
+                height: 55px;
+            }
+
+            .game-info h3 {
+                font-size: 1.1rem;
+            }
+
+            /* Game Intro Mobile */
+            .intro-content {
+                padding: 25px 20px;
+            }
+
+            .intro-header h1 {
+                font-size: 1.4rem;
+            }
+
+            .intro-icon {
+                font-size: 2rem;
+            }
+
+            .rule-item p, .feature-item span:last-child {
+                font-size: 0.85rem;
+            }
+
+            .ui-overlay {
+                padding: 8px 12px;
+                position: relative;
+                background: rgba(0, 0, 0, 0.3);
+                border-radius: 10px;
+                margin: 10px;
+            }
+
+            .player-avatar {
+                width: 32px;
+                height: 32px;
+                font-size: 1.2rem;
+            }
+
+            .player-name {
+                font-size: 0.85rem;
+            }
+
+            .stats {
+                gap: 6px;
+            }
+
+            .stat-box {
+                padding: 5px 10px;
+                font-size: 0.75rem;
+                border-radius: 12px;
+            }
+
+            .ghost-indicator {
+                top: auto;
+                right: 10px;
+                bottom: 80px;
+            }
+
+            .ghost-player {
+                font-size: 0.65rem;
+                padding: 4px 8px;
+            }
+
+            .ghost-avatar {
+                width: 18px;
+                height: 18px;
+                font-size: 0.7rem;
+            }
+
+            .controls {
+                position: relative;
+                bottom: auto;
+                left: auto;
+                transform: none;
+                justify-content: center;
+                padding: 10px;
+            }
+
+            .control-btn {
+                padding: 8px 16px;
+                font-size: 0.8rem;
+            }
+
+            canvas {
+                border-radius: 12px;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            }
+
+            .modal-content {
+                padding: 25px 20px;
+                border-radius: 18px;
+                max-width: 90%;
+            }
+
+            .modal-content h2 {
+                font-size: 1.4rem;
+            }
+
+            .rank-display {
+                font-size: 2.2rem;
+                margin: 15px 0;
+            }
+
+            .leaderboard-item {
+                padding: 8px;
+                font-size: 0.85rem;
+            }
+
+            .leaderboard-avatar {
+                width: 24px;
+                height: 24px;
+            }
+        }
+
+        /* Tablet Responsive */
+        @media (min-width: 481px) and (max-width: 768px) {
+            .profile-form {
+                max-width: 380px;
+            }
+
+            .ui-overlay {
+                padding: 10px 15px;
+            }
+
+            .player-avatar {
+                width: 36px;
+                height: 36px;
+            }
+
+            .stat-box {
+                padding: 6px 12px;
+                font-size: 0.85rem;
+            }
+
+            canvas {
+                border-radius: 16px;
+            }
+        }
+
+        /* Prevent zoom on input focus (iOS) */
+        @media (max-width: 768px) {
+            .form-input {
+                font-size: 16px;
+            }
+        }
+
+        /* Language Toggle Button */
+        .lang-toggle {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            z-index: 9999;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .lang-toggle:hover {
+            background: rgba(94, 129, 244, 0.3);
+            border-color: #5e81f4;
+            transform: scale(1.1);
+        }
+
+        @media (max-width: 480px) {
+            .lang-toggle {
+                width: 38px;
+                height: 38px;
+                font-size: 0.85rem;
+                top: 10px;
+                right: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Language Toggle Button -->
+    <button class="lang-toggle" id="lang-toggle" onclick="toggleLanguage()">EN</button>
+
+    <!-- Profile Setup Screen -->
+    <div class="profile-screen" id="profile-screen">
+        <h1 class="profile-title">SUDOKU BATTLE</h1>
+        <p class="profile-subtitle" data-i18n="profileSubtitle">Create your profile to start playing</p>
+
+        <div class="profile-form">
+            <div class="form-group">
+                <label class="form-label" data-i18n="nickname">Nickname</label>
+                <input type="text" class="form-input" id="nickname-input"
+                       data-i18n="nicknamePlaceholder" placeholder="Enter your nickname" maxlength="20">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" data-i18n="chooseAvatar">Choose Avatar</label>
+                <div class="avatar-grid" id="avatar-grid">
+                    <!-- Avatars will be loaded dynamically -->
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" data-i18n="chooseColor">Choose Color</label>
+                <div class="color-grid" id="color-grid">
+                    <!-- Colors will be loaded dynamically -->
+                </div>
+            </div>
+
+            <button class="start-btn" id="start-game-btn" disabled data-i18n="continue">Continue</button>
+        </div>
+    </div>
+
+    <!-- Game Selection Screen -->
+    <div class="game-select-screen hidden" id="game-select-screen">
+        <h1 class="profile-title" data-i18n="miniGames">MINI GAMES</h1>
+        <p class="profile-subtitle" data-i18n="chooseGame">Choose a game to play</p>
+
+        <div class="game-grid" id="game-grid">
+            <div class="game-card" data-game="sudoku">
+                <div class="game-icon">🔢</div>
+                <div class="game-info">
+                    <h3 data-i18n="sudokuBattle">Sudoku Battle</h3>
+                    <p data-i18n="sudokuDesc">6x6 Daily Challenge</p>
+                </div>
+                <div class="game-badge" data-i18n="daily">Daily</div>
+            </div>
+            <div class="game-card" data-game="streams">
+                <div class="game-icon">🔗</div>
+                <div class="game-info">
+                    <h3 data-i18n="streams">Streams</h3>
+                    <p data-i18n="streamsDesc">Connect numbers 1-20</p>
+                </div>
+                <div class="game-badge" data-i18n="daily">Daily</div>
+            </div>
+            <div class="game-card" data-game="hitori">
+                <div class="game-icon">⬛</div>
+                <div class="game-info">
+                    <h3 data-i18n="hitori">Hitori</h3>
+                    <p data-i18n="hitoriDesc">Mark cells to remove duplicates</p>
+                </div>
+                <div class="game-badge" data-i18n="daily">Daily</div>
+            </div>
+            <div class="game-card" data-game="nurikabe">
+                <div class="game-icon">🏝️</div>
+                <div class="game-info">
+                    <h3 data-i18n="nurikabe">Nurikabe</h3>
+                    <p data-i18n="nurikabeDesc">Fill the sea, leave islands</p>
+                </div>
+                <div class="game-badge" data-i18n="daily">Daily</div>
+            </div>
+            <div class="game-card" data-game="connect4">
+                <div class="game-icon">🃏</div>
+                <div class="game-info">
+                    <h3 data-i18n="connect4">Card Connect 4</h3>
+                    <p data-i18n="connect4Desc">Place cards to make 4 in a row</p>
+                </div>
+                <div class="game-badge">Beta</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Intro Screen -->
+    <div class="game-intro-screen hidden" id="game-intro-screen">
+        <div class="intro-content">
+            <div class="intro-header">
+                <span class="intro-icon">🔢</span>
+                <h1 data-i18n="sudokuBattle">Sudoku Battle</h1>
+            </div>
+
+            <div class="intro-rules">
+                <h2 data-i18n="howToPlay">How to Play</h2>
+                <div class="rule-item">
+                    <span class="rule-icon">📋</span>
+                    <p data-i18n="sudokuRule1">Fill the 6x6 grid with numbers 1-6</p>
+                </div>
+                <div class="rule-item">
+                    <span class="rule-icon">↔️</span>
+                    <p data-i18n="sudokuRule2">Each row must have 1-6 (no repeats)</p>
+                </div>
+                <div class="rule-item">
+                    <span class="rule-icon">↕️</span>
+                    <p data-i18n="sudokuRule3">Each column must have 1-6 (no repeats)</p>
+                </div>
+                <div class="rule-item">
+                    <span class="rule-icon">🔲</span>
+                    <p data-i18n="sudokuRule4">Each 2x3 box must have 1-6 (no repeats)</p>
+                </div>
+            </div>
+
+            <div class="intro-features">
+                <h2 data-i18n="features">Features</h2>
+                <div class="feature-item">
+                    <span class="feature-icon">📅</span>
+                    <span data-i18n="sudokuFeature1">One puzzle per day - same for everyone!</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">👻</span>
+                    <span data-i18n="sudokuFeature2">Watch ghost replays of other players</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🏆</span>
+                    <span data-i18n="sudokuFeature3">Compete on the daily leaderboard</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">❌</span>
+                    <span data-i18n="sudokuFeature4">3 mistakes and you're out!</span>
+                </div>
+            </div>
+
+            <button class="start-btn" id="start-sudoku-btn" data-i18n="startGame">Start Game</button>
+            <button class="back-btn" id="back-to-games-btn" data-i18n="backToGames">← Back to Games</button>
+        </div>
+    </div>
+
+    <!-- Streams Intro Screen -->
+    <div class="game-intro-screen hidden" id="streams-intro-screen">
+        <div class="intro-content">
+            <div class="intro-header">
+                <span class="intro-icon">🔗</span>
+                <h1 data-i18n="streams">Streams</h1>
+            </div>
+
+            <div class="intro-rules">
+                <h2 data-i18n="howToPlay">How to Play</h2>
+                <div class="rule-item">
+                    <span class="rule-icon">🔢</span>
+                    <p data-i18n="streamsRule1">Numbers 1-20 appear one at a time randomly</p>
+                </div>
+                <div class="rule-item">
+                    <span class="rule-icon">📍</span>
+                    <p data-i18n="streamsRule2">Place each number on the 4x5 grid</p>
+                </div>
+                <div class="rule-item">
+                    <span class="rule-icon">🔗</span>
+                    <p data-i18n="streamsRule3">Create "streams" - consecutive numbers (1-2-3...) next to each other</p>
+                </div>
+                <div class="rule-item">
+                    <span class="rule-icon">⬆️</span>
+                    <p data-i18n="streamsRule4">Adjacent means up/down/left/right (not diagonal)</p>
+                </div>
+            </div>
+
+            <div class="intro-features">
+                <h2 data-i18n="scoring">Scoring</h2>
+                <div class="feature-item">
+                    <span class="feature-icon">📊</span>
+                    <span data-i18n="streamsScore1">Stream of 2: 1 pt | 3: 3 pts | 4: 6 pts | 5: 10 pts...</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🎯</span>
+                    <span data-i18n="streamsScore2">Longer streams = exponentially more points!</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">📅</span>
+                    <span data-i18n="streamsScore3">Same puzzle for everyone - compete fairly!</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🏆</span>
+                    <span data-i18n="streamsScore4">One chance per day - make it count!</span>
+                </div>
+            </div>
+
+            <button class="start-btn" id="start-streams-btn" data-i18n="startGame">Start Game</button>
+            <button class="back-btn" id="back-to-games-btn-streams" data-i18n="backToGames">← Back to Games</button>
+        </div>
+    </div>
+
+    <!-- Game Container -->
+    <div id="game-container" style="display: none;">
+        <div class="ui-overlay">
+            <div class="player-info">
+                <div class="player-avatar" id="player-avatar"></div>
+                <span class="player-name" id="player-name"></span>
+            </div>
+            <div class="stats">
+                <div class="stat-box" id="timer">00:00</div>
+                <div class="stat-box mistakes" id="mistakes">0/3</div>
+                <div class="stat-box" id="difficulty-display">Medium</div>
+            </div>
+        </div>
+        <div class="ghost-indicator" id="ghost-indicator">
+            <!-- Ghost players will be shown here -->
+        </div>
+        <div class="controls">
+            <button class="control-btn" id="hint-btn" data-i18n="hint">Hint</button>
+        </div>
+    </div>
+
+    <!-- Win Modal -->
+    <div class="modal" id="win-modal">
+        <div class="modal-content">
+            <h2 data-i18n="congratulations">🎉 Congratulations!</h2>
+            <p data-i18n="solvedToday">You solved today's puzzle!</p>
+            <div class="rank-display" id="rank-display">#1</div>
+            <p><span data-i18n="time">Time</span>: <span id="final-time">00:00</span></p>
+            <p style="color: #888; font-size: 0.9rem;" data-i18n="comeBackTomorrow">Come back tomorrow for a new puzzle!</p>
+            <div class="leaderboard" id="leaderboard">
+                <!-- Leaderboard items -->
+            </div>
+            <button class="control-btn" id="view-ranking-btn" data-i18n="viewRanking">View Today's Ranking</button>
+        </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div class="modal" id="gameover-modal">
+        <div class="modal-content gameover">
+            <h2 data-i18n="gameOver">Game Over</h2>
+            <p data-i18n="tooManyMistakes">Too many mistakes!</p>
+            <p style="color: #888; font-size: 0.9rem;" data-i18n="comeBackTomorrow">Come back tomorrow for a new puzzle!</p>
+            <button class="control-btn" id="view-ranking-btn-gameover" data-i18n="viewRanking">View Today's Ranking</button>
+        </div>
+    </div>
+
+    <!-- Already Played Modal -->
+    <div class="modal" id="already-played-modal">
+        <div class="modal-content">
+            <h2 data-i18n="alreadyPlayed">✅ Already Played Today!</h2>
+            <p><span data-i18n="yourTime">Your time</span>: <span id="today-time">00:00</span></p>
+            <div class="rank-display" id="today-rank">#1</div>
+            <p style="color: #888; font-size: 0.9rem;" data-i18n="comeBackTomorrow">Come back tomorrow for a new puzzle!</p>
+            <div class="leaderboard" id="today-leaderboard">
+                <!-- Today's leaderboard -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Today's Ranking Modal -->
+    <div class="modal" id="ranking-modal">
+        <div class="modal-content" style="max-height: 80vh; overflow-y: auto;">
+            <h2 data-i18n="todayRanking">🏆 Today's Ranking</h2>
+            <div class="leaderboard" id="full-ranking" style="max-height: 50vh; overflow-y: auto;">
+                <!-- Full ranking -->
+            </div>
+            <button class="control-btn" id="close-ranking-btn" data-i18n="close">Close</button>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>

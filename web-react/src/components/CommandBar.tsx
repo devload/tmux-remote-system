@@ -6,14 +6,29 @@ interface CommandBarProps {
   disabled: boolean;
 }
 
-const QUICK_COMMANDS = [
+// Command shortcuts
+const COMMAND_SHORTCUTS = [
   { label: 'ls -la', cmd: 'ls -la\n' },
   { label: 'git status', cmd: 'git status\n' },
   { label: 'pwd', cmd: 'pwd\n' },
   { label: 'clear', cmd: 'clear\n' },
+];
+
+// Control keys
+const CONTROL_KEYS = [
   { label: 'Ctrl+C', cmd: '\x03' },
   { label: 'Ctrl+D', cmd: '\x04' },
   { label: 'Ctrl+Z', cmd: '\x1a' },
+];
+
+// Special keys (for mobile - keys that can't be typed easily)
+const SPECIAL_KEYS = [
+  { label: 'ESC', cmd: '\x1b', icon: '⎋' },
+  { label: '↑', cmd: '\x1b[A', icon: '↑' },
+  { label: '↓', cmd: '\x1b[B', icon: '↓' },
+  { label: '←', cmd: '\x1b[D', icon: '←' },
+  { label: '→', cmd: '\x1b[C', icon: '→' },
+  { label: 'Tab', cmd: '\t', icon: '⇥' },
 ];
 
 export function CommandBar({ onSend, disabled }: CommandBarProps) {
@@ -64,16 +79,54 @@ export function CommandBar({ onSend, disabled }: CommandBarProps) {
   return (
     <div className="command-bar">
       <div className="quick-commands">
-        {QUICK_COMMANDS.map((qc) => (
-          <button
-            key={qc.label}
-            className="quick-cmd-btn"
-            onClick={() => handleQuickCommand(qc.cmd)}
-            disabled={disabled}
-          >
-            {qc.label}
-          </button>
-        ))}
+        {/* Special keys for mobile */}
+        <div className="key-group special-keys">
+          {SPECIAL_KEYS.map((key) => (
+            <button
+              key={key.label}
+              className="quick-cmd-btn special-key-btn"
+              onClick={() => handleQuickCommand(key.cmd)}
+              disabled={disabled}
+              title={key.label}
+            >
+              {key.icon}
+            </button>
+          ))}
+        </div>
+
+        {/* Divider */}
+        <div className="key-divider" />
+
+        {/* Control keys */}
+        <div className="key-group control-keys">
+          {CONTROL_KEYS.map((key) => (
+            <button
+              key={key.label}
+              className="quick-cmd-btn control-key-btn"
+              onClick={() => handleQuickCommand(key.cmd)}
+              disabled={disabled}
+            >
+              {key.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Divider */}
+        <div className="key-divider" />
+
+        {/* Command shortcuts */}
+        <div className="key-group command-shortcuts">
+          {COMMAND_SHORTCUTS.map((cmd) => (
+            <button
+              key={cmd.label}
+              className="quick-cmd-btn"
+              onClick={() => handleQuickCommand(cmd.cmd)}
+              disabled={disabled}
+            >
+              {cmd.label}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="command-input-container">
         <input

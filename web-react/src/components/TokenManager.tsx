@@ -7,7 +7,8 @@ interface TokenManagerProps {
   onClose: () => void;
 }
 
-const API_URL = `${window.location.protocol}//${window.location.host}`;
+const API_URL = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.host}`;
+const PLATFORM_API_URL = import.meta.env.VITE_PLATFORM_API_URL || 'https://api.sessioncast.io';
 
 export function TokenManager({ authToken, onClose }: TokenManagerProps) {
   const { t } = useLanguage();
@@ -15,6 +16,23 @@ export function TokenManager({ authToken, onClose }: TokenManagerProps) {
   const [newToken, setNewToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [relayUrl, setRelayUrl] = useState<string>('wss://relay.sessioncast.io/ws');
+
+  const fetchUserInfo = useCallback(async () => {
+    try {
+      const response = await fetch(`${PLATFORM_API_URL}/api/users/me`, {
+        headers: { 'Authorization': `Bearer ${authToken}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.relayUrl) {
+          setRelayUrl(data.relayUrl);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch user info', e);
+    }
+  }, [authToken]);
 
   const fetchTokens = useCallback(async () => {
     try {
@@ -34,7 +52,8 @@ export function TokenManager({ authToken, onClose }: TokenManagerProps) {
 
   useEffect(() => {
     fetchTokens();
-  }, [fetchTokens]);
+    fetchUserInfo();
+  }, [fetchTokens, fetchUserInfo]);
 
   const handleGenerateToken = async () => {
     setLoading(true);
@@ -138,9 +157,12 @@ export function TokenManager({ authToken, onClose }: TokenManagerProps) {
           <div className="config-example">
             <h3>{t('configExample')}</h3>
             <pre>{`# ~/.tmux-remote.yml
-machineId: my-machine
-relay: ws://localhost:8080/ws
-token: ${newToken || 'agt_xxxx...'}`}</pre>
+machineId: ${navigator.platform || 'my-machine'}
+relay: ${relayUrl}
+token: ${newToken || tokens[0] || 'agt_xxxx...'}`}</pre>
+            <p className="relay-hint">
+              🔗 {t('yourRelayUrl')}: <code>{relayUrl}</code>
+            </p>
           </div>
         </div>
       </div>

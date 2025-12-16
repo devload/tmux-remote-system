@@ -33,6 +33,37 @@ sessions:
     tmuxSession: monitor
     label: "Home · System Monitor"
 
+# API Configuration (Optional)
+# Enable this to allow external API calls (n8n, GitHub Actions, etc.)
+# to execute commands or call your local LLM through SessionCast
+api:
+  enabled: false
+
+  # Your agent's UUID from the SessionCast platform
+  # Get this from the web UI: Dashboard > Agents > Your Agent > API Settings
+  agentId: "00000000-0000-0000-0000-000000000000"
+
+  # Command execution settings
+  exec:
+    enabled: true
+    shell: /bin/bash
+    workingDir: ~
+    defaultTimeout: 30000  # 30 seconds
+    # Optionally restrict to specific commands (regex patterns)
+    # If empty, all commands are allowed
+    # allowedCommands:
+    #   - "git .*"
+    #   - "npm .*"
+    #   - "python .*"
+
+  # LLM settings (local Ollama, OpenAI, etc.)
+  llm:
+    enabled: true
+    provider: ollama  # ollama, openai
+    baseUrl: http://localhost:11434  # Ollama default
+    model: llama2
+    # apiKey: sk-xxx  # Required for OpenAI
+
 # Example for a server machine:
 # machineId: server
 # relay: wss://relay.yourdomain.com/ws

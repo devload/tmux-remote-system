@@ -30,6 +30,9 @@ public class SessionManager {
     // Track when sessions went offline
     private final Map<String, Instant> offlineTimestamps = new ConcurrentHashMap<>();
 
+    // Agent ID -> WebSocket session (for API forwarding)
+    private final Map<String, WebSocketSession> agentSessions = new ConcurrentHashMap<>();
+
     // Stale session threshold (30 minutes)
     private static final long STALE_SESSION_THRESHOLD_MS = 30 * 60 * 1000;
 
@@ -86,6 +89,10 @@ public class SessionManager {
             return;
         }
 
+        // Cache last screen for instant display when new viewer joins
+        sessionInfo.setLastScreen(payload);
+        sessionInfo.setLastScreenType(type);
+
         // Forward with original type (screen or screenGz)
         Message screenMessage = Message.builder()
                 .type(type)
@@ -130,6 +137,13 @@ public class SessionManager {
     }
 
     public void sendSessionList(WebSocketSession wsSession, String ownerEmail) {
+        // Debug: log all sessions and their owners
+        log.info("sendSessionList: requestOwner={}, totalSessions={}", ownerEmail, sessions.size());
+        sessions.forEach((id, info) -> {
+            log.info("  Session: id={}, owner={}, match={}", id, info.getOwnerEmail(),
+                    ownerEmail != null && ownerEmail.equals(info.getOwnerEmail()));
+        });
+
         List<SessionListItem> sessionList = sessions.values().stream()
                 // Only show sessions that belong to this user (exact match required)
                 .filter(info -> ownerEmail != null && ownerEmail.equals(info.getOwnerEmail()))
@@ -218,7 +232,33 @@ public class SessionManager {
 
     public record Stats(int totalSessions, int onlineSessions, int totalViewers) {}
 
+    /**
+     * Count active sessions for a specific owner
+     * Used for plan limit enforcement
+     */
+    public int countSessionsByOwner(String ownerEmail) {
+        if (ownerEmail == null) {
+            return 0;
+        }
+        return (int) sessions.values().stream()
+                .filter(info -> ownerEmail.equals(info.getOwnerEmail()))
+                .filter(info -> "online".equals(info.getStatus()))
+                .count();
+    }
+
+    /**
+     * Check if a session is already registered (for duplicate detection)
+     */
+    public boolean isSessionRegistered(String sessionId) {
+        SessionInfo info = sessions.get(sessionId);
+        return info != null && "online".equals(info.getStatus());
+    }
+
     private void broadcastToViewers(SessionInfo sessionInfo, Message message) {
+        int viewerCount = sessionInfo.getViewers().size();
+        if (viewerCount > 0) {
+            log.debug("Broadcasting {} to {} viewers for session {}", message.getType(), viewerCount, sessionInfo.getId());
+        }
         sessionInfo.getViewers().forEach(viewer -> sendMessage(viewer, message));
     }
 
@@ -355,5 +395,71 @@ public class SessionManager {
                 .build();
         sendMessage(sessionInfo.getHostSession(), killMsg);
         log.info("Forwarded killSession to host: session={}", sessionId);
+    }
+
+    // ============================================
+    // Agent API Methods (for external API)
+    // ============================================
+
+    /**
+     * Register an agent session for API forwarding
+     */
+    public void registerAgent(String agentId, WebSocketSession wsSession) {
+        agentSessions.put(agentId, wsSession);
+        log.info("Agent registered for API: agentId={}", agentId);
+    }
+
+    /**
+     * Unregister an agent session
+     */
+    public void unregisterAgent(String agentId) {
+        agentSessions.remove(agentId);
+        log.info("Agent unregistered: agentId={}", agentId);
+    }
+
+    /**
+     * Send a message to a specific agent
+     * @return true if message was sent, false if agent is not connected
+     */
+    public boolean sendToAgent(String agentId, Message message) {
+        WebSocketSession session = agentSessions.get(agentId);
+        if (session == null || !session.isOpen()) {
+            log.warn("Agent not connected: {}", agentId);
+            return false;
+        }
+
+        try {
+            String json = objectMapper.writeValueAsString(message);
+            synchronized (session) {
+                if (session.isOpen()) {
+                    session.sendMessage(new TextMessage(json));
+                    return true;
+                }
+            }
+        } catch (IOException e) {
+            log.error("Failed to send message to agent {}", agentId, e);
+        }
+        return false;
+    }
+
+    /**
+     * Check if an agent is connected
+     */
+    public boolean isAgentConnected(String agentId) {
+        WebSocketSession session = agentSessions.get(agentId);
+        return session != null && session.isOpen();
+    }
+
+    /**
+     * Handle agent disconnect - clean up from agentSessions
+     */
+    public void handleAgentDisconnect(WebSocketSession wsSession) {
+        agentSessions.entrySet().removeIf(entry -> {
+            if (entry.getValue().getId().equals(wsSession.getId())) {
+                log.info("Agent disconnected: agentId={}", entry.getKey());
+                return true;
+            }
+            return false;
+        });
     }
 }

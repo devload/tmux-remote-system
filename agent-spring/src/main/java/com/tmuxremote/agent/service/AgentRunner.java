@@ -1,5 +1,6 @@
 package com.tmuxremote.agent.service;
 
+import com.tmuxremote.agent.client.ApiWebSocketClient;
 import com.tmuxremote.agent.config.ConfigLoader;
 import com.tmuxremote.agent.dto.AgentConfig;
 import jakarta.annotation.PreDestroy;
@@ -8,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
+import java.net.URI;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.*;
@@ -25,6 +27,7 @@ public class AgentRunner implements CommandLineRunner {
     private String machineId;
     private String relayUrl;
     private String agentToken;
+    private ApiWebSocketClient apiClient;
     private static final long SCAN_INTERVAL_SECONDS = 5;
 
     @Override
@@ -38,6 +41,12 @@ public class AgentRunner implements CommandLineRunner {
         log.info("Loaded configuration: machineId={}, relay={}, token={}",
                 machineId, relayUrl, agentToken != null ? "present" : "none");
 
+        // Start API client if configured
+        AgentConfig.ApiConfig apiConfig = config.getApi();
+        if (apiConfig != null && apiConfig.isEnabled() && apiConfig.getAgentId() != null) {
+            startApiClient(apiConfig);
+        }
+
         // Initial scan
         scanAndUpdateSessions();
 
@@ -48,6 +57,17 @@ public class AgentRunner implements CommandLineRunner {
         log.info("Host Agent started with auto-discovery (scanning every {}s)", SCAN_INTERVAL_SECONDS);
 
         Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
+    }
+
+    private void startApiClient(AgentConfig.ApiConfig apiConfig) {
+        try {
+            URI uri = new URI(relayUrl);
+            apiClient = new ApiWebSocketClient(uri, apiConfig, machineId, agentToken);
+            apiClient.connectWithJitter();
+            log.info("API client started for agentId={}", apiConfig.getAgentId());
+        } catch (Exception e) {
+            log.error("Failed to start API client", e);
+        }
     }
 
     private void scanAndUpdateSessions() {
@@ -140,6 +160,9 @@ public class AgentRunner implements CommandLineRunner {
     public void shutdown() {
         log.info("Shutting down Host Agent...");
         scheduler.shutdown();
+        if (apiClient != null) {
+            apiClient.shutdown();
+        }
         for (TmuxSessionHandler handler : handlers.values()) {
             handler.stop();
         }

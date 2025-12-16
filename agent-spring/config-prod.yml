@@ -1,0 +1,28 @@
+# Production Server Agent Configuration
+machineId: prod-server
+
+# Production relay server
+relay: wss://relay.sessioncast.io/ws
+
+# Agent token (get from SessionCast web UI)
+token: agt_YOUR_PROD_TOKEN_HERE
+
+# API Configuration
+api:
+  enabled: true
+  agentId: "YOUR_PROD_AGENT_UUID"
+
+  exec:
+    enabled: true
+    shell: /bin/bash
+    defaultTimeout: 30000
+    # Restrict commands in production for safety
+    # allowedCommands:
+    #   - "git .*"
+    #   - "docker .*"
+
+  llm:
+    enabled: true
+    provider: ollama
+    baseUrl: http://localhost:11434
+    model: llama2

@@ -6,18 +6,47 @@ interface OnboardingGuideProps {
   authToken: string;
 }
 
-const API_URL = `${window.location.protocol}//${window.location.host}`;
-const RELAY_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
+interface UserInfo {
+  relayAlias?: string;
+  relayUrl?: string;
+  plan?: string;
+}
+
+const API_URL = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.host}`;
+const PLATFORM_API_URL = import.meta.env.VITE_PLATFORM_API_URL || 'https://api.sessioncast.io';
 
 export function OnboardingGuide({ authToken }: OnboardingGuideProps) {
   const { t } = useLanguage();
   const [agentToken, setAgentToken] = useState<string | null>(null);
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    fetchOrCreateToken();
+    Promise.all([
+      fetchOrCreateToken(),
+      fetchUserInfo()
+    ]).finally(() => setLoading(false));
   }, [authToken]);
+
+  const fetchUserInfo = async () => {
+    try {
+      const response = await fetch(`${PLATFORM_API_URL}/api/users/me`, {
+        headers: { 'Authorization': `Bearer ${authToken}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUserInfo({
+          relayAlias: data.relayAlias,
+          relayUrl: data.relayUrl,
+          plan: data.plan
+        });
+      }
+    } catch (e) {
+      console.error('Failed to fetch user info', e);
+    }
+  };
 
   const fetchOrCreateToken = async () => {
     try {
@@ -29,7 +58,6 @@ export function OnboardingGuide({ authToken }: OnboardingGuideProps) {
         const data = await listResponse.json();
         if (data.tokens && data.tokens.length > 0) {
           setAgentToken(data.tokens[0]);
-          setLoading(false);
           return;
         }
       }
@@ -45,8 +73,6 @@ export function OnboardingGuide({ authToken }: OnboardingGuideProps) {
       }
     } catch (e) {
       console.error('Failed to fetch/create token', e);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -56,9 +82,15 @@ export function OnboardingGuide({ authToken }: OnboardingGuideProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Use user's personal relay URL if available
+  const relayUrl = userInfo?.relayUrl || 'wss://relay.sessioncast.io/ws';
+
+  // Generate a suggested machineId based on platform
+  const suggestedMachineId = navigator.platform?.toLowerCase().replace(/\s+/g, '-') || 'my-machine';
+
   const configContent = `# ~/.tmux-remote.yml
-machineId: my-machine
-relay: ${RELAY_URL}
+machineId: ${suggestedMachineId}
+relay: ${relayUrl}
 token: ${agentToken || 'loading...'}`;
 
   if (loading) {
@@ -114,6 +146,18 @@ token: ${agentToken || 'loading...'}`;
                 {t('copyToken')}
               </button>
             </div>
+            {userInfo?.relayAlias && (
+              <div className="relay-info">
+                <span className="relay-label">{t('yourRelayUrl')}</span>
+                <code className="relay-value">{relayUrl}</code>
+                <button
+                  className="copy-relay-btn"
+                  onClick={() => handleCopy(relayUrl)}
+                >
+                  {t('copy')}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

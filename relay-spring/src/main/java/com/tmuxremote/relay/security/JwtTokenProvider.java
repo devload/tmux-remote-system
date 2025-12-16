@@ -52,6 +52,12 @@ public class JwtTokenProvider {
                 .parseSignedClaims(token)
                 .getPayload();
 
+        // Platform JWT has email in "email" claim, not in subject
+        String email = claims.get("email", String.class);
+        if (email != null) {
+            return email;
+        }
+        // Fallback to subject for backwards compatibility
         return claims.getSubject();
     }
 

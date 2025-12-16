@@ -98,6 +98,8 @@ public class TmuxSessionHandler {
         scheduler.submit(() -> {
             while (running.get()) {
                 if (wsClient == null || !wsClient.isConnected()) {
+                    log.debug("Screen capture waiting for connection: session={}, wsClient={}, connected={}",
+                            sessionConfig.getTmuxSession(), wsClient != null, wsClient != null && wsClient.isConnected());
                     sleep(500);
                     continue;
                 }
@@ -124,8 +126,10 @@ public class TmuxSessionHandler {
                             if (USE_COMPRESSION && data.length > 512) {
                                 data = compress(data);
                                 wsClient.sendScreenCompressed(data);
+                                log.debug("Sent compressed screen: session={}, size={}", sessionConfig.getTmuxSession(), data.length);
                             } else {
                                 wsClient.sendScreen(data);
+                                log.debug("Sent screen: session={}, size={}", sessionConfig.getTmuxSession(), data.length);
                             }
                         }
 

@@ -16,3 +16,10 @@ export interface Message {
 }
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
+
+export interface PlanLimitError {
+  code: 'PLAN_LIMIT_EXCEEDED';
+  messageKo: string;
+  messageEn: string;
+  upgradeUrl: string;
+}

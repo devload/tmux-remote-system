@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Streams - Mini Games</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Language Toggle Button */
+        .lang-toggle {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            z-index: 9999;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .lang-toggle:hover {
+            background: rgba(94, 129, 244, 0.3);
+            border-color: #5e81f4;
+            transform: scale(1.1);
+        }
+
+        @media (max-width: 480px) {
+            .lang-toggle {
+                width: 38px;
+                height: 38px;
+                font-size: 0.85rem;
+                top: 10px;
+                right: 10px;
+            }
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            color: #fff;
+        }
+
+        /* Game Container */
+        #game-container {
+            position: relative;
+            touch-action: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            max-width: 100%;
+        }
+
+        canvas {
+            border-radius: 20px;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5),
+                        0 0 40px rgba(94, 129, 244, 0.2);
+        }
+
+        .ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+        }
+
+        .ui-overlay > * {
+            pointer-events: auto;
+        }
+
+        .player-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .player-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .player-name {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .stats {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .stat-box {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-box.remaining {
+            color: #ffd700;
+        }
+
+        .stat-box.score {
+            color: #4ade80;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .stat-box.score.updated {
+            animation: scorePopup 0.4s ease;
+        }
+
+        @keyframes scorePopup {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); color: #fff; }
+            100% { transform: scale(1); }
+        }
+
+        .ghost-indicator {
+            position: absolute;
+            top: 60px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            pointer-events: none;
+        }
+
+        .ghost-player {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.75rem;
+            opacity: 0.8;
+        }
+
+        .ghost-avatar {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+        }
+
+        .control-btn {
+            background: linear-gradient(135deg, #5e81f4 0%, #7c3aed 100%);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(94, 129, 244, 0.3);
+        }
+
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(94, 129, 244, 0.5);
+        }
+
+        /* Modals */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 40px;
+            border-radius: 25px;
+            text-align: center;
+            border: 2px solid rgba(94, 129, 244, 0.3);
+            box-shadow: 0 0 60px rgba(94, 129, 244, 0.2);
+            animation: modalPop 0.4s ease;
+            max-width: 450px;
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+
+        @keyframes modalPop {
+            0% { transform: scale(0.5); opacity: 0; }
+            70% { transform: scale(1.05); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-content h2 {
+            font-size: 1.8rem;
+            margin-bottom: 15px;
+            background: linear-gradient(135deg, #5e81f4 0%, #7c3aed 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .modal-content p {
+            color: #aaa;
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+
+        .score-display {
+            font-size: 3.5rem;
+            font-weight: 700;
+            margin: 20px 0;
+            color: #ffd700;
+        }
+
+        .rank-display {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 10px 0;
+            color: #7c3aed;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 20px 0;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-item .label {
+            font-size: 0.85rem;
+            color: #888;
+            margin-bottom: 5px;
+        }
+
+        .stat-item .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #4ade80;
+        }
+
+        .stream-details {
+            margin: 20px 0;
+            text-align: left;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .stream-detail {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+
+        .stream-detail .stream-score {
+            color: #4ade80;
+            font-weight: 600;
+        }
+
+        .leaderboard {
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .leaderboard-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            margin-bottom: 8px;
+        }
+
+        .leaderboard-item.me {
+            background: rgba(94, 129, 244, 0.2);
+            border: 1px solid rgba(94, 129, 244, 0.3);
+        }
+
+        .leaderboard-rank {
+            font-weight: 700;
+            width: 30px;
+            text-align: center;
+            color: #5e81f4;
+        }
+
+        .leaderboard-name {
+            flex: 1;
+        }
+
+        .leaderboard-score {
+            color: #ffd700;
+            font-weight: 600;
+        }
+
+        .leaderboard-stream {
+            color: #4ade80;
+            font-size: 0.85rem;
+        }
+
+        .modal-content .control-btn {
+            margin-top: 20px;
+        }
+
+        /* Tutorial Modal Styles */
+        .tutorial-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin: 15px 0;
+            padding: 12px 15px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            text-align: left;
+        }
+
+        .tutorial-icon {
+            font-size: 2rem;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .tutorial-section p {
+            color: #ddd;
+            margin: 0;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        .score-table {
+            margin: 20px 0;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .score-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .score-row:last-child {
+            border-bottom: none;
+        }
+
+        .score-row.header {
+            background: rgba(94, 129, 244, 0.2);
+            font-weight: 600;
+            color: #5e81f4;
+        }
+
+        .score-row span:last-child {
+            color: #4ade80;
+            font-weight: 600;
+        }
+
+        .tutorial-tip {
+            color: #ffd700 !important;
+            font-size: 0.9rem;
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(255, 215, 0, 0.1);
+            border-radius: 8px;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 480px) {
+            .ui-overlay {
+                padding: 8px 12px;
+                position: relative;
+                background: rgba(0, 0, 0, 0.3);
+                border-radius: 10px;
+                margin: 10px;
+            }
+
+            .player-avatar {
+                width: 32px;
+                height: 32px;
+                font-size: 1.2rem;
+            }
+
+            .player-name {
+                font-size: 0.85rem;
+            }
+
+            .stats {
+                gap: 6px;
+            }
+
+            .stat-box {
+                padding: 5px 10px;
+                font-size: 0.75rem;
+                border-radius: 12px;
+            }
+
+            .ghost-indicator {
+                top: auto;
+                right: 10px;
+                bottom: 80px;
+            }
+
+            .ghost-player {
+                font-size: 0.65rem;
+                padding: 4px 8px;
+            }
+
+            .ghost-avatar {
+                width: 18px;
+                height: 18px;
+                font-size: 0.7rem;
+            }
+
+            .controls {
+                position: relative;
+                bottom: auto;
+                left: auto;
+                transform: none;
+                justify-content: center;
+                padding: 10px;
+            }
+
+            .control-btn {
+                padding: 8px 16px;
+                font-size: 0.8rem;
+            }
+
+            canvas {
+                border-radius: 12px;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            }
+
+            .modal-content {
+                padding: 25px 20px;
+                border-radius: 18px;
+                max-width: 90%;
+            }
+
+            .modal-content h2 {
+                font-size: 1.4rem;
+            }
+
+            .score-display {
+                font-size: 2.5rem;
+                margin: 15px 0;
+            }
+
+            .rank-display {
+                font-size: 1.5rem;
+            }
+
+            .stat-row {
+                gap: 20px;
+            }
+
+            .stat-item .value {
+                font-size: 1.2rem;
+            }
+
+            .leaderboard-item {
+                padding: 8px;
+                font-size: 0.85rem;
+            }
+        }
+
+        /* Tablet Responsive */
+        @media (min-width: 481px) and (max-width: 768px) {
+            .ui-overlay {
+                padding: 10px 15px;
+            }
+
+            .player-avatar {
+                width: 36px;
+                height: 36px;
+            }
+
+            .stat-box {
+                padding: 6px 12px;
+                font-size: 0.85rem;
+            }
+
+            canvas {
+                border-radius: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Language Toggle Button -->
+    <button class="lang-toggle" id="lang-toggle" onclick="toggleLanguage()">EN</button>
+
+    <!-- Game Container -->
+    <div id="game-container">
+        <div class="ui-overlay">
+            <div class="player-info">
+                <div class="player-avatar" id="player-avatar"></div>
+                <span class="player-name" id="player-name"></span>
+            </div>
+            <div class="stats">
+                <div class="stat-box score" id="live-score">0 pts</div>
+                <div class="stat-box remaining" id="numbers-remaining">20/20</div>
+            </div>
+        </div>
+        <div class="ghost-indicator" id="ghost-indicator">
+            <!-- Ghost players will be shown here -->
+        </div>
+        <div class="controls">
+            <button class="control-btn" onclick="window.location.href='index.html'" data-i18n="backToGames">Back to Games</button>
+        </div>
+    </div>
+
+    <!-- Result Modal -->
+    <div class="modal" id="result-modal">
+        <div class="modal-content">
+            <h2 data-i18n="gameComplete">Game Complete!</h2>
+            <div class="score-display" id="final-score">0</div>
+            <p data-i18n="totalScore">Total Score</p>
+
+            <div class="stat-row">
+                <div class="stat-item">
+                    <div class="label" data-i18n="longestStream">Longest Stream</div>
+                    <div class="value" id="longest-stream">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="label" data-i18n="todayRank">Today's Rank</div>
+                    <div class="value" id="final-rank">#1</div>
+                </div>
+            </div>
+
+            <div class="stream-details" id="stream-details">
+                <!-- Stream details -->
+            </div>
+
+            <p style="color: #888; font-size: 0.9rem; margin-top: 15px;" data-i18n="comeBackTomorrow">Come back tomorrow for a new puzzle!</p>
+
+            <div class="leaderboard" id="result-leaderboard">
+                <!-- Leaderboard -->
+            </div>
+
+            <button class="control-btn" onclick="window.location.href='index.html'" data-i18n="backToGames">Back to Games</button>
+        </div>
+    </div>
+
+    <!-- How to Play Modal -->
+    <div class="modal" id="tutorial-modal">
+        <div class="modal-content">
+            <h2 data-i18n="howToPlay">How to Play</h2>
+
+            <div class="tutorial-section">
+                <div class="tutorial-icon">🚇</div>
+                <p data-i18n="tutorialDesc1">Place numbers 1-20 on metro stations.</p>
+            </div>
+
+            <div class="tutorial-section">
+                <div class="tutorial-icon">🔗</div>
+                <p data-i18n="tutorialDesc2">Connect consecutive numbers on adjacent stations to form streams.</p>
+            </div>
+
+            <div class="tutorial-section">
+                <div class="tutorial-icon">📈</div>
+                <p data-i18n="tutorialDesc3">Longer streams = Higher scores!</p>
+            </div>
+
+            <div class="score-table">
+                <div class="score-row header">
+                    <span data-i18n="streamLength">Stream Length</span>
+                    <span data-i18n="points">Points</span>
+                </div>
+                <div class="score-row"><span>2 (ex: 3→4)</span><span>1</span></div>
+                <div class="score-row"><span>3 (ex: 3→4→5)</span><span>3</span></div>
+                <div class="score-row"><span>4</span><span>6</span></div>
+                <div class="score-row"><span>5</span><span>10</span></div>
+                <div class="score-row"><span>6+</span><span>15+</span></div>
+            </div>
+
+            <p class="tutorial-tip" data-i18n="tutorialTip">💡 Tip: One long stream beats many short ones!</p>
+
+            <button class="control-btn" id="start-game-btn" data-i18n="startGame">Start Game</button>
+        </div>
+    </div>
+
+    <!-- Already Played Modal -->
+    <div class="modal" id="already-played-modal">
+        <div class="modal-content">
+            <h2 data-i18n="alreadyPlayed">Already Played Today!</h2>
+            <div class="score-display" id="today-score">0</div>
+            <p data-i18n="yourScore">Your Score</p>
+
+            <div class="stat-row">
+                <div class="stat-item">
+                    <div class="label" data-i18n="longestStream">Longest Stream</div>
+                    <div class="value" id="today-longest">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="label" data-i18n="todayRank">Today's Rank</div>
+                    <div class="value" id="today-rank">#1</div>
+                </div>
+            </div>
+
+            <p style="color: #888; font-size: 0.9rem;" data-i18n="comeBackTomorrow">Come back tomorrow for a new puzzle!</p>
+
+            <div class="leaderboard" id="today-leaderboard">
+                <!-- Today's leaderboard -->
+            </div>
+
+            <button class="control-btn" onclick="window.location.href='index.html'" data-i18n="backToGames">Back to Games</button>
+        </div>
+    </div>
+
+    <script src="streams.js"></script>
+    <script>
+        // Apply translations on load
+        applyTranslations();
+
+        // Check for saved profile
+        const savedProfile = localStorage.getItem('sudoku_profile');
+        if (savedProfile) {
+            const profile = JSON.parse(savedProfile);
+            window.initStreamsGame(profile);
+        } else {
+            // Redirect to main page if no profile
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>

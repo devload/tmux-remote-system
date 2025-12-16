@@ -1,10 +1,13 @@
 .session-list {
   width: 260px;
+  height: 100%;
+  height: calc(var(--vh, 1vh) * 100);
   background-color: var(--bg-secondary);
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--border-color);
   transition: background-color 0.2s, border-color 0.2s;
+  flex-shrink: 0;
 }
 
 .session-list-header {
@@ -22,21 +25,44 @@
   color: var(--text-primary);
 }
 
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.user-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .header-actions {
   display: flex;
-  gap: 4px;
+  gap: 6px;
 }
 
 .theme-toggle,
 .logout-btn,
 .token-btn,
+.api-key-btn,
 .lang-toggle-btn {
   background: none;
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  padding: 6px 8px;
+  padding: 6px 10px;
   cursor: pointer;
   font-size: 14px;
+  min-width: 34px;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: background-color 0.15s, border-color 0.15s;
 }
 
@@ -49,6 +75,7 @@
 .theme-toggle:hover,
 .logout-btn:hover,
 .token-btn:hover,
+.api-key-btn:hover,
 .lang-toggle-btn:hover {
   background-color: var(--bg-hover);
   border-color: var(--border-hover);
@@ -274,4 +301,45 @@
   color: var(--text-muted);
   text-align: center;
   font-size: 14px;
+}
+
+/* Bottom section wrapper for ad and account settings */
+.sidebar-bottom-section {
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+/* Account settings inside bottom section */
+.account-settings-section {
+  padding: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.account-settings-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.account-settings-btn:hover {
+  background: var(--bg-active);
+  border-color: var(--accent);
+}
+
+.account-settings-btn svg {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.account-settings-btn:hover svg {
+  color: var(--accent);
 }

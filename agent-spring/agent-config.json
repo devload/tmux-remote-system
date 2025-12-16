@@ -1,0 +1,22 @@
+{
+  "machineId": "devload-mac",
+  "relay": "wss://tmux.devload.io/ws",
+  "token": "",
+  "sessions": [
+    {
+      "id": "android-dev-session",
+      "tmuxSession": "android-dev",
+      "label": "Android Dev"
+    },
+    {
+      "id": "remote-tmux-session",
+      "tmuxSession": "remoteTmux",
+      "label": "Remote Tmux"
+    },
+    {
+      "id": "smart-monkey-session",
+      "tmuxSession": "smartMonkey",
+      "label": "Smart Monkey"
+    }
+  ]
+}

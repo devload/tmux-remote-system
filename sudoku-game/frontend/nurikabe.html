@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Nurikabe - Mini Games</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Language Toggle Button */
+        .lang-toggle {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            z-index: 9999;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .lang-toggle:hover {
+            background: rgba(94, 129, 244, 0.3);
+            border-color: #5e81f4;
+            transform: scale(1.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            color: #fff;
+            padding: 20px;
+        }
+
+        /* Game Container */
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            max-width: 100%;
+        }
+
+        .ui-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            max-width: 400px;
+            padding: 10px 15px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+        }
+
+        .player-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .player-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+        }
+
+        .player-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .stats {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .stat-box {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .stat-box.timer {
+            color: #ffd700;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        /* Nurikabe Grid */
+        .nurikabe-grid {
+            display: grid;
+            gap: 2px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .nurikabe-cell {
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            font-weight: 700;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .nurikabe-cell.empty {
+            background: linear-gradient(135deg, #2a2a4e 0%, #1a1a3e 100%);
+            color: #fff;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .nurikabe-cell.empty:hover {
+            background: linear-gradient(135deg, #3a3a5e 0%, #2a2a4e 100%);
+            transform: scale(1.05);
+        }
+
+        .nurikabe-cell.island {
+            background: linear-gradient(135deg, #4a9eff 0%, #2d7dd2 100%);
+            color: #fff;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            cursor: default;
+            font-weight: 800;
+        }
+
+        .nurikabe-cell.sea {
+            background: linear-gradient(135deg, #1a1a2e 0%, #0a0a1e 100%);
+            color: #444;
+            border: 2px solid rgba(0, 0, 0, 0.3);
+        }
+
+        .nurikabe-cell.sea::after {
+            content: '~';
+            color: #3a5a8a;
+            font-size: 1.2rem;
+        }
+
+        .nurikabe-cell.error {
+            animation: shake 0.3s ease;
+            border-color: #ff4444 !important;
+        }
+
+        .nurikabe-cell.hint {
+            border-color: #4ade80 !important;
+            box-shadow: 0 0 15px rgba(74, 222, 128, 0.5);
+        }
+
+        .nurikabe-cell.pool-error {
+            border-color: #ff6b6b !important;
+            background: linear-gradient(135deg, #3a1a1e 0%, #2a0a0e 100%) !important;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .control-btn {
+            background: linear-gradient(135deg, #5e81f4 0%, #7c3aed 100%);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(94, 129, 244, 0.3);
+        }
+
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(94, 129, 244, 0.5);
+        }
+
+        .control-btn.secondary {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .control-btn.check {
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+            box-shadow: 0 5px 15px rgba(74, 222, 128, 0.3);
+        }
+
+        /* Modals */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 40px;
+            border-radius: 25px;
+            text-align: center;
+            border: 2px solid rgba(94, 129, 244, 0.3);
+            box-shadow: 0 0 60px rgba(94, 129, 244, 0.2);
+            animation: modalPop 0.4s ease;
+            max-width: 450px;
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+
+        @keyframes modalPop {
+            0% { transform: scale(0.5); opacity: 0; }
+            70% { transform: scale(1.05); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-content h2 {
+            font-size: 1.8rem;
+            margin-bottom: 15px;
+            background: linear-gradient(135deg, #5e81f4 0%, #7c3aed 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .modal-content p {
+            color: #aaa;
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+
+        .score-display {
+            font-size: 3rem;
+            font-weight: 700;
+            margin: 20px 0;
+            color: #ffd700;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 20px 0;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-item .label {
+            font-size: 0.85rem;
+            color: #888;
+            margin-bottom: 5px;
+        }
+
+        .stat-item .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #4ade80;
+        }
+
+        /* Tutorial */
+        .tutorial-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin: 15px 0;
+            padding: 12px 15px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            text-align: left;
+        }
+
+        .tutorial-section p {
+            color: #ddd;
+            margin: 0;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .rule-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #5e81f4;
+            margin: 15px 0 8px 0;
+            text-align: left;
+            padding-left: 10px;
+        }
+
+        .example-grid {
+            display: inline-grid;
+            gap: 2px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 6px;
+            border-radius: 8px;
+            margin: 10px 5px;
+        }
+
+        .example-cell {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            font-weight: 700;
+            border-radius: 4px;
+        }
+
+        .example-cell.island {
+            background: linear-gradient(135deg, #4a9eff 0%, #2d7dd2 100%);
+            color: #fff;
+        }
+
+        .example-cell.sea {
+            background: linear-gradient(135deg, #1a1a2e 0%, #0a0a1e 100%);
+            color: #3a5a8a;
+        }
+
+        .example-cell.empty {
+            background: #2a2a4e;
+            color: #666;
+        }
+
+        .example-cell.bad {
+            border: 2px solid #ff4444;
+        }
+
+        .example-cell.good {
+            border: 2px solid #4ade80;
+        }
+
+        .example-row {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 15px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+
+        .example-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .example-label {
+            font-size: 0.75rem;
+            color: #888;
+            text-align: center;
+            margin-top: 5px;
+        }
+
+        /* Leaderboard */
+        .leaderboard {
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .leaderboard-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            margin-bottom: 8px;
+        }
+
+        .leaderboard-item.me {
+            background: rgba(94, 129, 244, 0.2);
+            border: 1px solid rgba(94, 129, 244, 0.3);
+        }
+
+        .leaderboard-rank {
+            font-weight: 700;
+            width: 30px;
+            text-align: center;
+            color: #5e81f4;
+        }
+
+        .leaderboard-avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+        }
+
+        .leaderboard-name {
+            flex: 1;
+        }
+
+        .leaderboard-score {
+            color: #ffd700;
+            font-weight: 600;
+        }
+
+        .leaderboard-time {
+            color: #4ade80;
+            font-size: 0.85rem;
+        }
+
+        /* Mobile */
+        @media (max-width: 480px) {
+            .nurikabe-cell {
+                width: 40px;
+                height: 40px;
+                font-size: 1.1rem;
+            }
+
+            .lang-toggle {
+                width: 38px;
+                height: 38px;
+                font-size: 0.85rem;
+                top: 10px;
+                right: 10px;
+            }
+
+            .modal-content {
+                padding: 25px 20px;
+            }
+
+            .score-display {
+                font-size: 2.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Language Toggle Button -->
+    <button class="lang-toggle" id="lang-toggle" onclick="toggleLanguage()">EN</button>
+
+    <!-- Game Container -->
+    <div id="game-container">
+        <div class="ui-bar">
+            <div class="player-info">
+                <div class="player-avatar" id="player-avatar"></div>
+                <span class="player-name" id="player-name"></span>
+            </div>
+            <div class="stats">
+                <div class="stat-box timer" id="timer">0:00</div>
+            </div>
+        </div>
+
+        <div class="nurikabe-grid" id="nurikabe-grid">
+            <!-- Grid will be generated here -->
+        </div>
+
+        <div class="controls">
+            <button class="control-btn check" id="check-btn" data-i18n="checkAnswer">Check Answer</button>
+            <button class="control-btn secondary" id="hint-btn" data-i18n="hint">Hint</button>
+            <button class="control-btn secondary" onclick="window.location.href='index.html'" data-i18n="backToGames">Back</button>
+        </div>
+    </div>
+
+    <!-- Tutorial Modal -->
+    <div class="modal" id="tutorial-modal">
+        <div class="modal-content">
+            <h2 data-i18n="howToPlay">How to Play Nurikabe</h2>
+
+            <!-- Rule 1: Islands and Sea -->
+            <div class="rule-title" data-i18n="ruleTitle1">🏝️ Rule 1: Islands and Sea</div>
+            <div class="tutorial-section">
+                <p data-i18n="nurikabeRule1">Numbers represent islands. Each island has exactly that many cells. Tap empty cells to mark them as sea (dark).</p>
+            </div>
+
+            <div class="example-row">
+                <div class="example-container">
+                    <div class="example-grid" style="grid-template-columns: repeat(4, 32px);">
+                        <div class="example-cell island">3</div>
+                        <div class="example-cell empty">?</div>
+                        <div class="example-cell empty">?</div>
+                        <div class="example-cell empty">?</div>
+                    </div>
+                    <div class="example-label" data-i18n="beforeIsland">숫자 3 = 섬 크기 3</div>
+                </div>
+                <div style="font-size: 1.5rem; color: #5e81f4; margin-top: 20px;">→</div>
+                <div class="example-container">
+                    <div class="example-grid" style="grid-template-columns: repeat(4, 32px);">
+                        <div class="example-cell island good">3</div>
+                        <div class="example-cell island good"></div>
+                        <div class="example-cell island good"></div>
+                        <div class="example-cell sea">~</div>
+                    </div>
+                    <div class="example-label" data-i18n="islandExample">✅ 3칸짜리 섬 완성!</div>
+                </div>
+            </div>
+
+            <!-- Rule 2: No 2x2 Sea -->
+            <div class="rule-title" data-i18n="ruleTitle2">🌊 Rule 2: No 2×2 Sea Pools</div>
+            <div class="tutorial-section">
+                <p data-i18n="nurikabeRule2">Sea cells cannot form a 2×2 square. This would be a "pool" which is not allowed.</p>
+            </div>
+
+            <div class="example-row">
+                <div class="example-container">
+                    <div class="example-grid" style="grid-template-columns: repeat(3, 32px);">
+                        <div class="example-cell island">1</div>
+                        <div class="example-cell sea bad">~</div>
+                        <div class="example-cell sea bad">~</div>
+                        <div class="example-cell sea">~</div>
+                        <div class="example-cell sea bad">~</div>
+                        <div class="example-cell sea bad">~</div>
+                        <div class="example-cell sea">~</div>
+                        <div class="example-cell sea">~</div>
+                        <div class="example-cell island">1</div>
+                    </div>
+                    <div class="example-label" data-i18n="poolBad">❌ 2×2 바다 웅덩이!</div>
+                </div>
+                <div class="example-container">
+                    <div class="example-grid" style="grid-template-columns: repeat(3, 32px);">
+                        <div class="example-cell island">1</div>
+                        <div class="example-cell sea good">~</div>
+                        <div class="example-cell sea good">~</div>
+                        <div class="example-cell sea good">~</div>
+                        <div class="example-cell island good">2</div>
+                        <div class="example-cell sea good">~</div>
+                        <div class="example-cell sea good">~</div>
+                        <div class="example-cell island good"></div>
+                        <div class="example-cell island">1</div>
+                    </div>
+                    <div class="example-label" data-i18n="poolGood">✅ 웅덩이 없음!</div>
+                </div>
+            </div>
+
+            <!-- Rule 3: Connected Sea -->
+            <div class="rule-title" data-i18n="ruleTitle3">🔗 Rule 3: Sea Must Connect</div>
+            <div class="tutorial-section">
+                <p data-i18n="nurikabeRule3">All sea cells must be connected horizontally or vertically.</p>
+            </div>
+
+            <div class="example-row">
+                <div class="example-container">
+                    <div class="example-grid" style="grid-template-columns: repeat(3, 32px);">
+                        <div class="example-cell sea bad">~</div>
+                        <div class="example-cell island">2</div>
+                        <div class="example-cell sea bad">~</div>
+                        <div class="example-cell island"></div>
+                        <div class="example-cell island">1</div>
+                        <div class="example-cell sea bad">~</div>
+                        <div class="example-cell sea bad">~</div>
+                        <div class="example-cell sea bad">~</div>
+                        <div class="example-cell sea bad">~</div>
+                    </div>
+                    <div class="example-label" data-i18n="seaDisconnected">❌ 바다가 분리됨!</div>
+                </div>
+                <div class="example-container">
+                    <div class="example-grid" style="grid-template-columns: repeat(3, 32px);">
+                        <div class="example-cell sea good">~</div>
+                        <div class="example-cell sea good">~</div>
+                        <div class="example-cell sea good">~</div>
+                        <div class="example-cell island">2</div>
+                        <div class="example-cell island"></div>
+                        <div class="example-cell sea good">~</div>
+                        <div class="example-cell sea good">~</div>
+                        <div class="example-cell island">1</div>
+                        <div class="example-cell sea good">~</div>
+                    </div>
+                    <div class="example-label" data-i18n="seaConnected">✅ 바다가 모두 연결됨!</div>
+                </div>
+            </div>
+
+            <!-- Rule 4: Islands Don't Touch -->
+            <div class="rule-title" data-i18n="ruleTitle4">🚫 Rule 4: Islands Don't Touch</div>
+            <div class="tutorial-section">
+                <p data-i18n="nurikabeRule4">Different islands cannot touch horizontally or vertically (diagonal is OK).</p>
+            </div>
+
+            <div class="example-row">
+                <div class="example-container">
+                    <div class="example-grid" style="grid-template-columns: repeat(3, 32px);">
+                        <div class="example-cell island bad">2</div>
+                        <div class="example-cell island bad"></div>
+                        <div class="example-cell island bad">1</div>
+                        <div class="example-cell sea">~</div>
+                        <div class="example-cell sea">~</div>
+                        <div class="example-cell sea">~</div>
+                        <div class="example-cell sea">~</div>
+                        <div class="example-cell sea">~</div>
+                        <div class="example-cell sea">~</div>
+                    </div>
+                    <div class="example-label" data-i18n="islandsTouchBad">❌ 섬끼리 붙어있음!</div>
+                </div>
+                <div class="example-container">
+                    <div class="example-grid" style="grid-template-columns: repeat(3, 32px);">
+                        <div class="example-cell island good">2</div>
+                        <div class="example-cell island good"></div>
+                        <div class="example-cell sea good">~</div>
+                        <div class="example-cell sea good">~</div>
+                        <div class="example-cell sea good">~</div>
+                        <div class="example-cell island good">1</div>
+                        <div class="example-cell sea good">~</div>
+                        <div class="example-cell sea good">~</div>
+                        <div class="example-cell sea good">~</div>
+                    </div>
+                    <div class="example-label" data-i18n="islandsSeparate">✅ 바다로 분리됨!</div>
+                </div>
+            </div>
+
+            <!-- Scoring -->
+            <div class="rule-title" data-i18n="scoringTitle">💰 Scoring</div>
+            <div class="tutorial-section">
+                <p data-i18n="scoringInfo">Base: 1000pts | -2pts/sec | -50pts/hint | -30pts/mistake</p>
+            </div>
+
+            <button class="control-btn" id="start-game-btn" data-i18n="startGame">Start Game</button>
+        </div>
+    </div>
+
+    <!-- Result Modal -->
+    <div class="modal" id="result-modal">
+        <div class="modal-content">
+            <h2 data-i18n="congratulations">Congratulations!</h2>
+            <div class="score-display" id="final-score">0</div>
+            <p data-i18n="totalScore">Total Score</p>
+
+            <div class="stat-row">
+                <div class="stat-item">
+                    <div class="label" data-i18n="time">Time</div>
+                    <div class="value" id="final-time">0:00</div>
+                </div>
+                <div class="stat-item">
+                    <div class="label" data-i18n="todayRank">Rank</div>
+                    <div class="value" id="final-rank">#1</div>
+                </div>
+            </div>
+
+            <div class="stat-row">
+                <div class="stat-item">
+                    <div class="label" data-i18n="hints">Hints</div>
+                    <div class="value" id="final-hints">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="label" data-i18n="mistakes">Mistakes</div>
+                    <div class="value" id="final-mistakes">0</div>
+                </div>
+            </div>
+
+            <p style="color: #888; font-size: 0.9rem;" data-i18n="comeBackTomorrow">Come back tomorrow for a new puzzle!</p>
+
+            <div class="leaderboard" id="result-leaderboard"></div>
+
+            <button class="control-btn" onclick="window.location.href='index.html'" data-i18n="backToGames">Back to Games</button>
+        </div>
+    </div>
+
+    <!-- Already Played Modal -->
+    <div class="modal" id="already-played-modal">
+        <div class="modal-content">
+            <h2 data-i18n="alreadyPlayed">Already Played Today!</h2>
+            <div class="score-display" id="today-score">0</div>
+            <p data-i18n="yourScore">Your Score</p>
+
+            <div class="stat-row">
+                <div class="stat-item">
+                    <div class="label" data-i18n="time">Time</div>
+                    <div class="value" id="today-time">0:00</div>
+                </div>
+                <div class="stat-item">
+                    <div class="label" data-i18n="todayRank">Rank</div>
+                    <div class="value" id="today-rank">#1</div>
+                </div>
+            </div>
+
+            <p style="color: #888; font-size: 0.9rem;" data-i18n="comeBackTomorrow">Come back tomorrow for a new puzzle!</p>
+
+            <div class="leaderboard" id="today-leaderboard"></div>
+
+            <button class="control-btn" onclick="window.location.href='index.html'" data-i18n="backToGames">Back to Games</button>
+        </div>
+    </div>
+
+    <script src="nurikabe.js"></script>
+    <script>
+        applyTranslations();
+
+        const savedProfile = localStorage.getItem('sudoku_profile');
+        if (savedProfile) {
+            const profile = JSON.parse(savedProfile);
+            window.initNurikabeGame(profile);
+        } else {
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>

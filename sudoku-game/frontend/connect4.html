@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Card Connect 4</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            min-height: 100dvh;
+            color: white;
+            overflow-x: hidden;
+        }
+
+        .game-container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 10px;
+            padding-top: max(10px, env(safe-area-inset-top));
+            padding-bottom: max(10px, env(safe-area-inset-bottom));
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            min-height: 100dvh;
+        }
+
+        /* Header */
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            margin-bottom: 8px;
+        }
+
+        .back-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .game-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            background: linear-gradient(45deg, #f39c12, #e74c3c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Combined Info Row */
+        .info-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        /* Score Display */
+        .score-panel {
+            display: flex;
+            justify-content: space-around;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            padding: 8px;
+            flex: 1;
+        }
+
+        .score-item {
+            text-align: center;
+        }
+
+        .score-label {
+            font-size: 0.65rem;
+            color: #888;
+            margin-bottom: 2px;
+        }
+
+        .score-value {
+            font-size: 1rem;
+            font-weight: bold;
+            color: #f39c12;
+        }
+
+        /* Current Card Display */
+        .current-card-section {
+            background: rgba(255,255,255,0.08);
+            border-radius: 10px;
+            padding: 8px 15px;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .current-card-label {
+            font-size: 0.7rem;
+            color: #888;
+            display: none;
+        }
+
+        .current-card-value {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 45px;
+            height: 60px;
+            border-radius: 8px;
+            font-size: 1.8rem;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        .current-card-value.player {
+            background: linear-gradient(145deg, #3498db, #2980b9);
+            border: 2px solid #5dade2;
+        }
+
+        .current-card-value.ai {
+            background: linear-gradient(145deg, #e74c3c, #c0392b);
+            border: 2px solid #ec7063;
+        }
+
+        .current-card-value.empty {
+            background: rgba(255,255,255,0.1);
+            color: #666;
+        }
+
+        .deck-info {
+            font-size: 0.7rem;
+            color: #888;
+        }
+
+        /* Turn Indicator */
+        .turn-indicator {
+            text-align: center;
+            padding: 8px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 0.85rem;
+            transition: all 0.3s;
+        }
+
+        .turn-indicator.player {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+        }
+
+        .turn-indicator.ai1 {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+        }
+
+        .turn-indicator.ai2 {
+            background: linear-gradient(45deg, #9b59b6, #8e44ad);
+        }
+
+        .turn-indicator.ai3 {
+            background: linear-gradient(45deg, #1abc9c, #16a085);
+        }
+
+        /* Legacy */
+        .turn-indicator.ai {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+        }
+
+        /* Game Board */
+        .board-container {
+            background: linear-gradient(145deg, #2c3e50, #34495e);
+            border-radius: 12px;
+            padding: 8px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+            flex: 1;
+            display: flex;
+            align-items: center;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            width: 100%;
+        }
+
+        .cell {
+            aspect-ratio: 1;
+            background: rgba(0,0,0,0.4);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border: 2px solid transparent;
+        }
+
+        .cell:hover:not(.player):not(.ai) {
+            background: rgba(255,255,255,0.15);
+            border-color: rgba(255,255,255,0.3);
+        }
+
+        .cell.placeable {
+            background: rgba(52, 152, 219, 0.2);
+            border-color: rgba(52, 152, 219, 0.5);
+            cursor: pointer;
+        }
+
+        .cell.placeable:hover {
+            background: rgba(52, 152, 219, 0.4);
+            border-color: #3498db;
+            transform: scale(1.05);
+        }
+
+        .cell.player {
+            background: linear-gradient(145deg, #3498db, #2980b9);
+            box-shadow: inset 0 -3px 5px rgba(0,0,0,0.3);
+        }
+
+        .cell.ai1 {
+            background: linear-gradient(145deg, #e74c3c, #c0392b);
+            box-shadow: inset 0 -3px 5px rgba(0,0,0,0.3);
+        }
+
+        .cell.ai2 {
+            background: linear-gradient(145deg, #9b59b6, #8e44ad);
+            box-shadow: inset 0 -3px 5px rgba(0,0,0,0.3);
+        }
+
+        .cell.ai3 {
+            background: linear-gradient(145deg, #1abc9c, #16a085);
+            box-shadow: inset 0 -3px 5px rgba(0,0,0,0.3);
+        }
+
+        /* Legacy support */
+        .cell.ai {
+            background: linear-gradient(145deg, #e74c3c, #c0392b);
+            box-shadow: inset 0 -3px 5px rgba(0,0,0,0.3);
+        }
+
+        .cell.winning {
+            animation: pulse 0.5s ease-in-out infinite alternate;
+            box-shadow: 0 0 20px rgba(241, 196, 15, 0.8);
+        }
+
+        @keyframes pulse {
+            from { transform: scale(1); }
+            to { transform: scale(1.1); }
+        }
+
+        .cell.highlight {
+            animation: placeAnim 0.3s ease-out;
+        }
+
+        @keyframes placeAnim {
+            0% { transform: scale(0); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        /* AI Move Highlight - 더 눈에 띄는 효과 */
+        .cell.ai-last-move {
+            animation: aiMoveHighlight 1.5s ease-out;
+            box-shadow: 0 0 0 4px rgba(241, 196, 15, 0.9), 0 0 25px rgba(241, 196, 15, 0.7);
+            z-index: 10;
+        }
+
+        @keyframes aiMoveHighlight {
+            0% {
+                transform: scale(0);
+                box-shadow: 0 0 0 8px rgba(241, 196, 15, 1), 0 0 40px rgba(241, 196, 15, 1);
+            }
+            30% {
+                transform: scale(1.3);
+                box-shadow: 0 0 0 8px rgba(241, 196, 15, 1), 0 0 40px rgba(241, 196, 15, 1);
+            }
+            50% {
+                transform: scale(1);
+                box-shadow: 0 0 0 6px rgba(241, 196, 15, 0.9), 0 0 30px rgba(241, 196, 15, 0.8);
+            }
+            70% {
+                transform: scale(1.1);
+                box-shadow: 0 0 0 5px rgba(241, 196, 15, 0.8), 0 0 25px rgba(241, 196, 15, 0.7);
+            }
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 4px rgba(241, 196, 15, 0.9), 0 0 25px rgba(241, 196, 15, 0.7);
+            }
+        }
+
+        /* AI 카드 숫자 표시 효과 */
+        .cell.ai-last-move .card-number {
+            animation: numberReveal 0.5s ease-out 0.2s both;
+        }
+
+        @keyframes numberReveal {
+            0% {
+                opacity: 0;
+                transform: scale(2);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .cell .card-number {
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+
+        /* Control Buttons */
+        .control-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .control-btn.primary {
+            background: linear-gradient(45deg, #f39c12, #e67e22);
+            color: white;
+        }
+
+        .control-btn.secondary {
+            background: rgba(255,255,255,0.1);
+            color: white;
+        }
+
+        .control-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: linear-gradient(145deg, #2c3e50, #34495e);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-title {
+            font-size: 1.8rem;
+            margin-bottom: 15px;
+        }
+
+        .modal-score {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #f39c12;
+            margin: 20px 0;
+        }
+
+        .modal-details {
+            text-align: left;
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 15px 0;
+            font-size: 0.9rem;
+        }
+
+        .modal-details p {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        /* Tutorial Modal */
+        .tutorial-section {
+            text-align: left;
+            margin: 15px 0;
+            padding: 15px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 10px;
+        }
+
+        .tutorial-section h3 {
+            color: #f39c12;
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+
+        .tutorial-section p {
+            color: #ccc;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .deck-display {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 10px;
+            justify-content: center;
+        }
+
+        .deck-display span {
+            background: rgba(52, 152, 219, 0.3);
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.8rem;
+        }
+
+        /* Difficulty Selection */
+        .difficulty-select {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 15px 0;
+        }
+
+        .diff-btn {
+            padding: 12px 20px;
+            border: 2px solid transparent;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: bold;
+        }
+
+        .diff-btn:hover, .diff-btn.selected {
+            border-color: #f39c12;
+            background: rgba(243, 156, 18, 0.2);
+        }
+
+        .diff-btn.easy { border-left: 4px solid #2ecc71; }
+        .diff-btn.medium { border-left: 4px solid #f39c12; }
+        .diff-btn.hard { border-left: 4px solid #e74c3c; }
+
+        /* Legend & Controls combined */
+        .bottom-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 8px;
+            padding: 5px 0;
+        }
+
+        .legend {
+            display: flex;
+            gap: 12px;
+            font-size: 0.7rem;
+            color: #888;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .legend-color {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+        }
+
+        .legend-color.player-color {
+            background: linear-gradient(145deg, #3498db, #2980b9);
+        }
+
+        .legend-color.ai1-color {
+            background: linear-gradient(145deg, #e74c3c, #c0392b);
+        }
+
+        .legend-color.ai2-color {
+            background: linear-gradient(145deg, #9b59b6, #8e44ad);
+        }
+
+        .legend-color.ai3-color {
+            background: linear-gradient(145deg, #1abc9c, #16a085);
+        }
+
+        /* Legacy */
+        .legend-color.ai-color {
+            background: linear-gradient(145deg, #e74c3c, #c0392b);
+        }
+
+        /* Responsive */
+        @media (max-width: 400px) {
+            .cell {
+                font-size: 0.9rem;
+            }
+            .current-card-value {
+                width: 40px;
+                height: 52px;
+                font-size: 1.5rem;
+            }
+            .score-value {
+                font-size: 0.9rem;
+            }
+        }
+
+        @media (max-height: 700px) {
+            .game-header {
+                padding: 2px 0;
+                margin-bottom: 5px;
+            }
+            .info-row {
+                margin-bottom: 5px;
+            }
+            .turn-indicator {
+                padding: 6px;
+                margin-bottom: 5px;
+                font-size: 0.8rem;
+            }
+            .board-container {
+                padding: 6px;
+            }
+            .board {
+                gap: 4px;
+            }
+        }
+        /* Language Toggle Button */
+        .lang-toggle {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            z-index: 9999;
+            transition: all 0.3s;
+        }
+
+        .lang-toggle:hover {
+            background: rgba(243, 156, 18, 0.3);
+            border-color: #f39c12;
+        }
+    </style>
+</head>
+<body>
+    <!-- Language Toggle Button -->
+    <button class="lang-toggle" id="lang-toggle" onclick="toggleLanguage()">EN</button>
+
+    <div class="game-container">
+        <!-- Header -->
+        <div class="game-header">
+            <button class="back-btn" onclick="window.location.href='index.html'" data-i18n="back">← Back</button>
+            <div class="game-title" data-i18n="gameTitle">Card Connect 4</div>
+            <button class="back-btn" onclick="showTutorial()">?</button>
+        </div>
+
+        <!-- Combined Info Row -->
+        <div class="info-row">
+            <!-- Current Card -->
+            <div class="current-card-section">
+                <div class="current-card-value player" id="current-card">5</div>
+                <div class="deck-info">🃏 <span id="deck-count">19</span></div>
+            </div>
+
+            <!-- Score Panel -->
+            <div class="score-panel">
+                <div class="score-item">
+                    <div class="score-label" data-i18n="turn">Turn</div>
+                    <div class="score-value" id="turn-count">0</div>
+                </div>
+                <div class="score-item">
+                    <div class="score-label" data-i18n="cardSum">Sum</div>
+                    <div class="score-value" id="card-sum">0</div>
+                </div>
+                <div class="score-item">
+                    <div class="score-label" data-i18n="estScore">Score</div>
+                    <div class="score-value" id="est-score">1000</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Turn Indicator -->
+        <div class="turn-indicator player" id="turn-indicator">
+            Your Turn - Place card on the board
+        </div>
+
+        <!-- Game Board -->
+        <div class="board-container">
+            <div class="board" id="board">
+                <!-- 6 rows x 7 cols = 42 cells -->
+            </div>
+        </div>
+
+        <!-- Bottom Bar: Legend + Controls -->
+        <div class="bottom-bar">
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color player-color"></div>
+                    <span data-i18n="you">You</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color ai-color"></div>
+                    <span data-i18n="ai">AI</span>
+                </div>
+            </div>
+            <button class="control-btn secondary" onclick="restartGame()" style="padding: 8px 16px; font-size: 0.8rem;" data-i18n="newGame">New Game</button>
+        </div>
+    </div>
+
+    <!-- Tutorial Modal -->
+    <div class="modal" id="tutorial-modal">
+        <div class="modal-content">
+            <h2 class="modal-title" data-i18n="tutorialTitle">Card Connect 4</h2>
+
+            <div class="tutorial-section">
+                <h3 data-i18n="goal">Goal</h3>
+                <p data-i18n="goalDesc">Connect 4 of your cards in a row (horizontal, vertical, or diagonal) before the AI!</p>
+            </div>
+
+            <div class="tutorial-section">
+                <h3 data-i18n="howToPlay">How to Play</h3>
+                <p data-i18n="howToPlayDesc">1. Each turn, you draw a random card from your deck
+2. Click any cell on the board to place it
+3. You can place on empty cells OR on top of lower-numbered cards
+4. First to get 4 in a row wins!</p>
+            </div>
+
+            <div class="tutorial-section">
+                <h3 data-i18n="placementRule">Card Placement Rule</h3>
+                <p data-i18n="placementRuleDesc">Higher cards can cover lower cards!
+If there's already a card, you can only place a higher number on top of it.</p>
+            </div>
+
+            <div class="tutorial-section">
+                <h3 data-i18n="yourDeck">Your Deck (20 cards)</h3>
+                <div class="deck-display">
+                    <span>1 × 3</span>
+                    <span>2 × 3</span>
+                    <span>3 × 3</span>
+                    <span>4 × 2</span>
+                    <span>5 × 2</span>
+                    <span>6 × 2</span>
+                    <span>7 × 2</span>
+                    <span>8 × 1</span>
+                    <span>9 × 1</span>
+                    <span>10 × 1</span>
+                </div>
+            </div>
+
+            <div class="tutorial-section">
+                <h3 data-i18n="scoring">Scoring</h3>
+                <p data-i18n="scoringDesc">Base: 1000 pts
+− Card sum × 5 (lower cards = better!)
+− Turns × 10 (faster = better!)
++ Speed bonus (≤10 turns: +100)</p>
+            </div>
+
+            <div class="tutorial-section">
+                <h3 data-i18n="dailyMode">📅 Daily Mode</h3>
+                <p data-i18n="dailyModeDesc">Everyone gets the same card sequence each day!
+Both you and AI draw cards in the same order.</p>
+                <p style="color: #f39c12; margin-top: 8px;" data-i18n="betaNote">🧪 Beta: You can play multiple times for testing</p>
+            </div>
+
+            <div class="tutorial-section">
+                <h3 data-i18n="selectDifficulty">Select Difficulty</h3>
+                <div class="difficulty-select">
+                    <button class="diff-btn easy selected" data-diff="easy" data-i18n="easy">Easy</button>
+                    <button class="diff-btn medium" data-diff="medium" data-i18n="medium">Medium</button>
+                    <button class="diff-btn hard" data-diff="hard" data-i18n="hard">Hard</button>
+                </div>
+            </div>
+
+            <div class="modal-buttons">
+                <button class="control-btn primary" onclick="startGame()" data-i18n="startGame">Start Game</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Result Modal -->
+    <div class="modal" id="result-modal">
+        <div class="modal-content">
+            <h2 class="modal-title" id="result-title">Victory!</h2>
+            <div class="modal-score" id="final-score">850</div>
+            <p data-i18n="points">points</p>
+
+            <div class="modal-details" id="score-details">
+                <!-- Dynamically filled -->
+            </div>
+
+            <div class="modal-buttons">
+                <button class="control-btn secondary" onclick="window.location.href='index.html'" data-i18n="backToGames">Back to Games</button>
+                <button class="control-btn primary" onclick="restartGame()" data-i18n="playAgain">Play Again</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="connect4.js"></script>
+</body>
+</html>

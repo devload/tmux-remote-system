@@ -5,6 +5,7 @@
   background-color: var(--bg-primary);
   overflow: hidden;
   transition: background-color 0.2s;
+  min-height: 0;
 }
 
 .terminal-header {
@@ -56,6 +57,32 @@
 .header-right {
   display: flex;
   align-items: center;
+  gap: 8px;
+}
+
+.terminal-refresh-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.terminal-refresh-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+
+.terminal-refresh-btn:active {
+  transform: rotate(180deg);
 }
 
 .session-status {
@@ -78,11 +105,88 @@
   flex: 1;
   display: flex;
   position: relative;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .xterm-wrapper {
   flex: 1;
   padding: 8px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Mobile touch scroll improvements */
+@media (max-width: 768px) {
+  .xterm-wrapper {
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+
+  .xterm-wrapper .xterm {
+    touch-action: pan-y;
+  }
+
+  .xterm-wrapper .xterm-viewport {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .terminal-refresh-btn {
+    min-width: 44px;
+    min-height: 44px;
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* iPad Safari specific fixes */
+@supports (-webkit-touch-callout: none) {
+  .terminal-content {
+    /* Prevent iOS Safari from creating extra scrollable areas */
+    position: relative;
+    height: 100%;
+  }
+
+  .xterm-wrapper {
+    /* Force hardware acceleration */
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    /* Prevent text selection issues */
+    -webkit-user-select: none;
+    user-select: none;
+    /* Fix scrolling container */
+    overflow: hidden;
+  }
+
+  .xterm-wrapper .xterm {
+    /* Prevent canvas scaling issues */
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+  }
+
+  .xterm-wrapper .xterm-viewport {
+    /* Let xterm handle its own scrolling */
+    overflow-y: scroll !important;
+    -webkit-overflow-scrolling: touch;
+    /* Prevent momentum scroll from causing rendering issues */
+    overscroll-behavior: contain;
+  }
+
+  .xterm-wrapper .xterm-screen {
+    /* Prevent layout shifts */
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+  }
+
+  /* Fix canvas rendering */
+  .xterm-wrapper canvas {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    image-rendering: -webkit-optimize-contrast;
+  }
 }
 
 .terminal-placeholder {

@@ -1,113 +1,108 @@
 package com.tmuxremote.relay.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
-import java.io.File;
-import java.io.IOException;
-import java.security.SecureRandom;
-import java.util.Base64;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 public class AgentTokenService {
 
-    // agentToken -> ownerEmail
-    private final Map<String, String> tokenToOwner = new ConcurrentHashMap<>();
+    private final RestTemplate restTemplate;
+    private final String platformApiUrl;
 
-    // ownerEmail -> Set<agentToken>
-    private final Map<String, Set<String>> ownerToTokens = new ConcurrentHashMap<>();
+    // Cache: agentToken -> AgentInfo (with TTL)
+    private final Map<String, CachedAgentInfo> tokenCache = new ConcurrentHashMap<>();
 
-    private final SecureRandom secureRandom = new SecureRandom();
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private static final long CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-    @Value("${app.token-storage-path:./agent-tokens.json}")
-    private String tokenStoragePath;
-
-    @PostConstruct
-    public void init() {
-        loadTokensFromFile();
+    public AgentTokenService(
+            @Value("${platform.api.url:http://localhost:8080}") String platformApiUrl
+    ) {
+        this.restTemplate = new RestTemplate();
+        this.platformApiUrl = platformApiUrl;
     }
 
-    private void loadTokensFromFile() {
-        File file = new File(tokenStoragePath);
-        if (file.exists()) {
-            try {
-                Map<String, String> saved = objectMapper.readValue(file, new TypeReference<Map<String, String>>() {});
-                saved.forEach((token, owner) -> {
-                    tokenToOwner.put(token, owner);
-                    ownerToTokens.computeIfAbsent(owner, k -> ConcurrentHashMap.newKeySet()).add(token);
-                });
-                log.info("Loaded {} agent tokens from {}", saved.size(), tokenStoragePath);
-            } catch (IOException e) {
-                log.error("Failed to load tokens from file", e);
-            }
-        } else {
-            log.info("No token storage file found at {}, starting fresh", tokenStoragePath);
+    /**
+     * Agent info returned from token validation
+     */
+    public record AgentInfo(String email, String agentId) {}
+
+    /**
+     * Get agent info (email and agentId) by validating token against Platform API
+     */
+    public Optional<AgentInfo> getAgentInfoByToken(String token) {
+        if (token == null || token.isEmpty()) {
+            return Optional.empty();
         }
-    }
 
-    private void saveTokensToFile() {
+        // Check cache first
+        CachedAgentInfo cached = tokenCache.get(token);
+        if (cached != null && !cached.isExpired()) {
+            return Optional.ofNullable(cached.agentInfo);
+        }
+
+        // Call Platform API to validate token
         try {
-            objectMapper.writerWithDefaultPrettyPrinter().writeValue(new File(tokenStoragePath), tokenToOwner);
-            log.debug("Saved {} tokens to {}", tokenToOwner.size(), tokenStoragePath);
-        } catch (IOException e) {
-            log.error("Failed to save tokens to file", e);
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    platformApiUrl + "/internal/validate-agent/" + token,
+                    HttpMethod.GET,
+                    HttpEntity.EMPTY,
+                    Map.class
+            );
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                Map<String, Object> body = response.getBody();
+                String email = (String) body.get("userEmail");
+                String agentId = body.get("agentId") != null ? body.get("agentId").toString() : null;
+
+                if (email != null) {
+                    AgentInfo agentInfo = new AgentInfo(email, agentId);
+                    tokenCache.put(token, new CachedAgentInfo(agentInfo, System.currentTimeMillis()));
+                    log.debug("Token validated: {} -> email={}, agentId={}",
+                            token.substring(0, Math.min(12, token.length())) + "...", email, agentId);
+                    return Optional.of(agentInfo);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to validate token with Platform: {}", e.getMessage());
         }
+
+        // Cache negative result too
+        tokenCache.put(token, new CachedAgentInfo(null, System.currentTimeMillis()));
+        return Optional.empty();
     }
 
-    public String generateToken(String ownerEmail) {
-        byte[] bytes = new byte[24];
-        secureRandom.nextBytes(bytes);
-        String token = "agt_" + Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-
-        tokenToOwner.put(token, ownerEmail);
-        ownerToTokens.computeIfAbsent(ownerEmail, k -> ConcurrentHashMap.newKeySet()).add(token);
-
-        saveTokensToFile();
-        log.info("Agent token generated for owner: {}", ownerEmail);
-        return token;
+    /**
+     * Get owner email by validating token against Platform API
+     * @deprecated Use getAgentInfoByToken() instead
+     */
+    public Optional<String> getOwnerByToken(String token) {
+        return getAgentInfoByToken(token).map(AgentInfo::email);
     }
 
     public boolean validateToken(String token) {
-        return tokenToOwner.containsKey(token);
+        return getAgentInfoByToken(token).isPresent();
     }
 
-    public Optional<String> getOwnerByToken(String token) {
-        return Optional.ofNullable(tokenToOwner.get(token));
+    /**
+     * Clear cache for testing
+     */
+    public void clearCache() {
+        tokenCache.clear();
     }
 
-    public Set<String> getTokensByOwner(String ownerEmail) {
-        return ownerToTokens.getOrDefault(ownerEmail, Set.of());
-    }
-
-    public boolean revokeToken(String token, String ownerEmail) {
-        String actualOwner = tokenToOwner.get(token);
-        if (actualOwner != null && actualOwner.equals(ownerEmail)) {
-            tokenToOwner.remove(token);
-            Set<String> tokens = ownerToTokens.get(ownerEmail);
-            if (tokens != null) {
-                tokens.remove(token);
-            }
-            saveTokensToFile();
-            log.info("Agent token revoked: {} by {}", token.substring(0, 12) + "...", ownerEmail);
-            return true;
+    private record CachedAgentInfo(AgentInfo agentInfo, long cachedAt) {
+        boolean isExpired() {
+            return System.currentTimeMillis() - cachedAt > CACHE_TTL_MS;
         }
-        return false;
-    }
-
-    public Set<String> getOwnerTokenPrefixes(String ownerEmail) {
-        return getTokensByOwner(ownerEmail).stream()
-                .map(t -> t.substring(0, Math.min(t.length(), 16)) + "...")
-                .collect(Collectors.toSet());
     }
 }
