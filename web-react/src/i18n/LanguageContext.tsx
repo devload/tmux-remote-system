@@ -10,18 +10,28 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 function detectLanguage(): Language {
-  // Check localStorage first
+  // Check URL parameter first (from landing page)
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlLang = urlParams.get('lang');
+  if (urlLang === 'ko' || urlLang === 'en') {
+    // Save to localStorage for future visits
+    localStorage.setItem('lang', urlLang);
+    // Clean up URL (remove lang param)
+    urlParams.delete('lang');
+    const newUrl = urlParams.toString()
+      ? `${window.location.pathname}?${urlParams.toString()}`
+      : window.location.pathname;
+    window.history.replaceState({}, '', newUrl);
+    return urlLang;
+  }
+
+  // Check localStorage
   const saved = localStorage.getItem('lang');
   if (saved === 'ko' || saved === 'en') {
     return saved;
   }
 
-  // Check browser language
-  const browserLang = navigator.language.toLowerCase();
-  if (browserLang.startsWith('ko')) {
-    return 'ko';
-  }
-
+  // Default to English
   return 'en';
 }
 

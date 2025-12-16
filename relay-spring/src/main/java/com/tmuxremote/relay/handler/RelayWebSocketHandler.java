@@ -170,10 +170,12 @@ public class RelayWebSocketHandler extends TextWebSocketHandler {
             }
             sessionManager.registerHost(sessionId, label, machineId, ownerEmail, session);
 
-            // Register agent for API forwarding if agentId is available (from meta or token)
-            if (agentId != null && !agentId.isEmpty()) {
+            // Register agent for API forwarding ONLY if this is the ApiWebSocketClient session
+            // ApiWebSocketClient uses session ID format: "api-{agentId}"
+            if (agentId != null && !agentId.isEmpty() && sessionId.startsWith("api-")) {
                 sessionManager.registerAgent(agentId, session);
                 session.getAttributes().put("agentId", agentId);
+                log.info("Agent API session registered: agentId={}", agentId);
             }
 
             log.info("Host registered: session={}, machine={}, owner={}, alias={}, agentId={}",
