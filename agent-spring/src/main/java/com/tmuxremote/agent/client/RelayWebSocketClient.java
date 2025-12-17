@@ -30,17 +30,30 @@ public class RelayWebSocketClient extends WebSocketClient {
     private final Runnable onKillSession;
     private final AtomicBoolean isConnected = new AtomicBoolean(false);
     private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
+    private final AtomicBoolean circuitBreakerOpen = new AtomicBoolean(false);
+    private volatile long circuitBreakerResetTime = 0;
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    private final boolean autoReconnect; // If false, external code manages reconnection
 
-    private static final int MAX_RECONNECT_DELAY_MS = 30000;
-    private static final int BASE_RECONNECT_DELAY_MS = 1000;
+    private static final int MAX_RECONNECT_DELAY_MS = 60000;  // 1 minute max delay
+    private static final int BASE_RECONNECT_DELAY_MS = 2000;   // 2 seconds base delay
     private static final int INITIAL_CONNECT_JITTER_MS = 3000; // Random delay on first connect
+    private static final int MAX_RECONNECT_ATTEMPTS = 5;       // Stop after 5 failures
+    private static final int CIRCUIT_BREAKER_DURATION_MS = 120000; // 2 minutes cooldown after max attempts
 
     public RelayWebSocketClient(URI serverUri, AgentConfig.SessionConfig sessionConfig,
                                 String machineId, String agentToken, Consumer<String> onKeysReceived,
                                 Consumer<String> onCreateSession,
                                 java.util.function.BiConsumer<Integer, Integer> onResize,
                                 Runnable onKillSession) {
+        this(serverUri, sessionConfig, machineId, agentToken, onKeysReceived, onCreateSession, onResize, onKillSession, false);
+    }
+
+    public RelayWebSocketClient(URI serverUri, AgentConfig.SessionConfig sessionConfig,
+                                String machineId, String agentToken, Consumer<String> onKeysReceived,
+                                Consumer<String> onCreateSession,
+                                java.util.function.BiConsumer<Integer, Integer> onResize,
+                                Runnable onKillSession, boolean autoReconnect) {
         super(serverUri);
         this.sessionConfig = sessionConfig;
         this.machineId = machineId;
@@ -49,6 +62,7 @@ public class RelayWebSocketClient extends WebSocketClient {
         this.onCreateSession = onCreateSession;
         this.onResize = onResize;
         this.onKillSession = onKillSession;
+        this.autoReconnect = autoReconnect;
     }
 
     @Override
@@ -144,7 +158,9 @@ public class RelayWebSocketClient extends WebSocketClient {
         log.warn("Disconnected from relay: session={}, code={}, reason={}, remote={}",
                 sessionConfig.getId(), code, reason, remote);
         isConnected.set(false);
-        scheduleReconnect();
+        if (autoReconnect) {
+            scheduleReconnect();
+        }
     }
 
     @Override
@@ -218,11 +234,42 @@ public class RelayWebSocketClient extends WebSocketClient {
     }
 
     private void scheduleReconnect() {
+        // Check circuit breaker
+        if (circuitBreakerOpen.get()) {
+            long now = System.currentTimeMillis();
+            if (now < circuitBreakerResetTime) {
+                long remainingSeconds = (circuitBreakerResetTime - now) / 1000;
+                log.warn("Circuit breaker open for session {}. Retry in {} seconds",
+                        sessionConfig.getId(), remainingSeconds);
+                // Schedule check after circuit breaker resets
+                scheduler.schedule(this::scheduleReconnect, circuitBreakerResetTime - now, TimeUnit.MILLISECONDS);
+                return;
+            } else {
+                // Circuit breaker timeout passed, reset
+                log.info("Circuit breaker reset for session {}", sessionConfig.getId());
+                circuitBreakerOpen.set(false);
+                reconnectAttempts.set(0);
+            }
+        }
+
         int attempts = reconnectAttempts.incrementAndGet();
+
+        // Check max attempts - activate circuit breaker
+        if (attempts > MAX_RECONNECT_ATTEMPTS) {
+            log.error("Max reconnect attempts ({}) reached for session {}. Activating circuit breaker for {} seconds",
+                    MAX_RECONNECT_ATTEMPTS, sessionConfig.getId(), CIRCUIT_BREAKER_DURATION_MS / 1000);
+            circuitBreakerOpen.set(true);
+            circuitBreakerResetTime = System.currentTimeMillis() + CIRCUIT_BREAKER_DURATION_MS;
+            reconnectAttempts.set(0);
+            // Schedule retry after circuit breaker resets
+            scheduler.schedule(this::scheduleReconnect, CIRCUIT_BREAKER_DURATION_MS, TimeUnit.MILLISECONDS);
+            return;
+        }
+
         int delay = calculateBackoffDelay(attempts);
 
-        log.info("Scheduling reconnect for session {} in {} ms (attempt {})",
-                sessionConfig.getId(), delay, attempts);
+        log.info("Scheduling reconnect for session {} in {} ms (attempt {}/{})",
+                sessionConfig.getId(), delay, attempts, MAX_RECONNECT_ATTEMPTS);
 
         scheduler.schedule(() -> {
             try {

@@ -37,8 +37,13 @@ public class TmuxSessionHandler {
     private static final long FORCE_SEND_INTERVAL_MS = 10000;   // Force send every 10s (was 5s)
     private static final boolean USE_COMPRESSION = true;        // Enable gzip compression
     private static final int INITIAL_CONNECT_JITTER_MS = 5000;  // Random delay on first connect (0-5s)
-    private static final int RECONNECT_BASE_DELAY_MS = 3000;    // Base delay for reconnection
-    private static final int RECONNECT_MAX_JITTER_MS = 3000;    // Max additional jitter for reconnection
+    private static final int RECONNECT_BASE_DELAY_MS = 5000;    // Base delay for reconnection (increased)
+    private static final int RECONNECT_MAX_DELAY_MS = 60000;    // Max 60 seconds
+    private static final int MAX_RECONNECT_ATTEMPTS = 5;        // Max attempts before circuit breaker
+    private static final int CIRCUIT_BREAKER_DURATION_MS = 120000; // 2 minutes cooldown
+
+    private int reconnectAttempts = 0;
+    private long circuitBreakerResetTime = 0;
 
     public TmuxSessionHandler(AgentConfig.SessionConfig sessionConfig, String machineId, String relayUrl, String agentToken,
                               java.util.function.Consumer<String> onCreateSession) {
@@ -59,8 +64,31 @@ public class TmuxSessionHandler {
 
     private void connectAndRun() {
         while (running.get()) {
+            // Check circuit breaker
+            long now = System.currentTimeMillis();
+            if (circuitBreakerResetTime > 0 && now < circuitBreakerResetTime) {
+                long remainingSeconds = (circuitBreakerResetTime - now) / 1000;
+                log.warn("Circuit breaker active for session {}. Waiting {} seconds before retry",
+                        sessionConfig.getId(), remainingSeconds);
+                try {
+                    Thread.sleep(circuitBreakerResetTime - now);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+                // Reset after circuit breaker period
+                circuitBreakerResetTime = 0;
+                reconnectAttempts = 0;
+                continue;
+            }
+
+            boolean connectionSucceeded = false;
             try {
                 startWebSocketClient();
+                // Connection successful - reset counters
+                reconnectAttempts = 0;
+                connectionSucceeded = true;
+
                 if (!captureStarted.getAndSet(true)) {
                     startScreenCapture();
                 }
@@ -73,9 +101,36 @@ public class TmuxSessionHandler {
             }
 
             if (running.get()) {
-                // Add jitter to reconnection delay to prevent thundering herd
-                int reconnectDelay = RECONNECT_BASE_DELAY_MS + (int) (Math.random() * RECONNECT_MAX_JITTER_MS);
-                log.info("Reconnecting session handler for {} in {} ms...", sessionConfig.getId(), reconnectDelay);
+                int reconnectDelay;
+
+                if (!connectionSucceeded) {
+                    // Connection failed - apply exponential backoff
+                    reconnectAttempts++;
+
+                    // Check if we should activate circuit breaker
+                    if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
+                        log.error("Max reconnect attempts ({}) reached for session {}. Circuit breaker active for {} seconds",
+                                MAX_RECONNECT_ATTEMPTS, sessionConfig.getId(), CIRCUIT_BREAKER_DURATION_MS / 1000);
+                        circuitBreakerResetTime = System.currentTimeMillis() + CIRCUIT_BREAKER_DURATION_MS;
+                        continue;
+                    }
+
+                    // Exponential backoff with jitter
+                    int delay = (int) Math.min(
+                            RECONNECT_BASE_DELAY_MS * Math.pow(2, reconnectAttempts - 1),
+                            RECONNECT_MAX_DELAY_MS
+                    );
+                    int jitter = (int) (Math.random() * delay * 0.5);
+                    reconnectDelay = delay + jitter;
+
+                    log.info("Reconnecting session {} in {} ms (attempt {}/{})",
+                            sessionConfig.getId(), reconnectDelay, reconnectAttempts, MAX_RECONNECT_ATTEMPTS);
+                } else {
+                    // Was connected but disconnected - small delay before reconnect
+                    reconnectDelay = RECONNECT_BASE_DELAY_MS + (int) (Math.random() * 2000);
+                    log.info("Session {} disconnected, reconnecting in {} ms", sessionConfig.getId(), reconnectDelay);
+                }
+
                 try {
                     Thread.sleep(reconnectDelay);
                 } catch (InterruptedException ie) {
