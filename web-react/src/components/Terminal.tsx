@@ -70,12 +70,26 @@ export function Terminal({
     const initTimer = setTimeout(() => {
       if (!terminalRef.current) return;
 
-      // Detect mobile for adjusted settings
-      const isMobile = window.innerWidth <= 768;
+      // Detect screen size for responsive font
+      const screenWidth = window.innerWidth;
+
+      // Responsive font size based on screen width
+      // iPhone Mini: ~375px, iPhone Pro: ~390px, iPhone Pro Max: ~430px
+      let fontSize = 14; // Desktop default
+      if (screenWidth <= 380) {
+        // iPhone Mini and smaller - smallest font
+        fontSize = 10;
+      } else if (screenWidth <= 430) {
+        // iPhone Pro and similar
+        fontSize = 11;
+      } else if (screenWidth <= 768) {
+        // Tablets and larger phones
+        fontSize = 12;
+      }
 
       const xterm = new XTerm({
         cursorBlink: true,
-        fontSize: isMobile ? 12 : 14,
+        fontSize,
         fontFamily: 'Menlo, Monaco, "Courier New", monospace',
         rows: 24,
         cols: 80,

@@ -3,8 +3,23 @@ export type Language = 'ko' | 'en';
 export const translations = {
   ko: {
     // Onboarding
-    welcome: 'TMUX Remote에 오신 것을 환영합니다',
+    welcome: 'SessionCast에 오신 것을 환영합니다',
     noMachines: '아직 연결된 머신이 없습니다. 아래 단계를 따라 시작하세요.',
+
+    // AI Install
+    aiInstallTitle: 'AI로 자동 설치',
+    aiInstallDesc: '아래 프롬프트를 복사하여 AI 도구에 붙여넣으면 자동으로 설치해줍니다.',
+    copyPrompt: '프롬프트 복사',
+    compatibleWith: '호환 도구:',
+    orManualInstall: '또는 직접 설치',
+
+    // Prerequisites
+    prerequisitesTitle: '사전 요구사항',
+    prerequisitesDesc: '시작하기 전에 다음 프로그램들이 설치되어 있어야 합니다.',
+    ifNotInstalled: '미설치 시',
+    required: '필수',
+    wslNote: 'Windows에서는 WSL2가 필요합니다. 설치 후 Ubuntu를 실행하세요.',
+    verifyInstall: '설치 확인:',
 
     // Setup steps
     step1Title: 'Host Agent 설치',
@@ -24,6 +39,7 @@ export const translations = {
     step4Title: 'Agent 실행',
     step4Desc: 'Agent를 실행하여 머신을 연결하세요:',
     step4Hint: 'Agent가 자동으로 모든 tmux 세션을 감지합니다.',
+    runInBackground: '백그라운드 실행 (선택사항):',
 
     // Footer
     footerConnected: '연결되면 사이드바에 세션이 표시됩니다.',
@@ -80,8 +96,23 @@ export const translations = {
 
   en: {
     // Onboarding
-    welcome: 'Welcome to TMUX Remote',
+    welcome: 'Welcome to SessionCast',
     noMachines: 'No connected machines yet. Follow the steps below to get started.',
+
+    // AI Install
+    aiInstallTitle: 'Auto-Install with AI',
+    aiInstallDesc: 'Copy the prompt below and paste it into your AI tool for automatic installation.',
+    copyPrompt: 'Copy Prompt',
+    compatibleWith: 'Works with:',
+    orManualInstall: 'or install manually',
+
+    // Prerequisites
+    prerequisitesTitle: 'Prerequisites',
+    prerequisitesDesc: 'Make sure you have the following installed before starting.',
+    ifNotInstalled: 'if not installed',
+    required: 'Required',
+    wslNote: 'Windows requires WSL2. After installation, run Ubuntu.',
+    verifyInstall: 'Verify installation:',
 
     // Setup steps
     step1Title: 'Install the Host Agent',
@@ -101,6 +132,7 @@ export const translations = {
     step4Title: 'Start the Agent',
     step4Desc: 'Run the agent to connect your machine:',
     step4Hint: 'The agent will automatically discover all your tmux sessions.',
+    runInBackground: 'Run in background (optional):',
 
     // Footer
     footerConnected: 'Once connected, your sessions will appear in the sidebar.',

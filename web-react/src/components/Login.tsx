@@ -6,7 +6,7 @@ interface LoginProps {
   onLoginSuccess: (token: string) => void;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
+const PLATFORM_API_URL = import.meta.env.VITE_PLATFORM_API_URL || 'https://api.sessioncast.io';
 
 export function Login({ onLoginSuccess }: LoginProps) {
   const { t, lang, setLang } = useLanguage();
@@ -40,8 +40,8 @@ export function Login({ onLoginSuccess }: LoginProps) {
 
   const handleGoogleLogin = () => {
     setLoading(true);
-    // Redirect to Spring Security OAuth2 endpoint
-    window.location.href = `${API_URL}/oauth2/authorization/google`;
+    // Redirect to Platform API OAuth2 endpoint
+    window.location.href = `${PLATFORM_API_URL}/oauth2/authorization/google`;
   };
 
   return (

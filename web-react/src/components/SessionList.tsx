@@ -93,7 +93,7 @@ export function SessionList({ sessions, currentSession, onSelectSession, theme, 
         </div>
         <div className="header-actions">
           <button className="lang-toggle-btn" onClick={toggleLanguage} title={lang === 'ko' ? 'Switch to English' : '한국어로 전환'}>
-            {lang === 'ko' ? 'EN' : 'KO'}
+            {lang === 'ko' ? '한국어' : 'EN'}
           </button>
           <button className="theme-toggle" onClick={onToggleTheme} title={theme === 'dark' ? (lang === 'ko' ? '라이트 모드' : 'Light mode') : (lang === 'ko' ? '다크 모드' : 'Dark mode')}>
             {theme === 'dark' ? '☀️' : '🌙'}

@@ -12,7 +12,8 @@ interface UserInfo {
   plan?: string;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.host}`;
+type OS = 'mac' | 'windows' | 'linux';
+
 const PLATFORM_API_URL = import.meta.env.VITE_PLATFORM_API_URL || 'https://api.sessioncast.io';
 
 export function OnboardingGuide({ authToken }: OnboardingGuideProps) {
@@ -20,7 +21,13 @@ export function OnboardingGuide({ authToken }: OnboardingGuideProps) {
   const [agentToken, setAgentToken] = useState<string | null>(null);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [selectedOS, setSelectedOS] = useState<OS>(() => {
+    const platform = navigator.platform?.toLowerCase() || '';
+    if (platform.includes('mac')) return 'mac';
+    if (platform.includes('win')) return 'windows';
+    return 'linux';
+  });
 
   useEffect(() => {
     Promise.all([
@@ -50,7 +57,7 @@ export function OnboardingGuide({ authToken }: OnboardingGuideProps) {
 
   const fetchOrCreateToken = async () => {
     try {
-      const listResponse = await fetch(`${API_URL}/api/tokens`, {
+      const listResponse = await fetch(`${PLATFORM_API_URL}/api/tokens`, {
         headers: { 'Authorization': `Bearer ${authToken}` },
       });
 
@@ -62,7 +69,7 @@ export function OnboardingGuide({ authToken }: OnboardingGuideProps) {
         }
       }
 
-      const generateResponse = await fetch(`${API_URL}/api/tokens/generate`, {
+      const generateResponse = await fetch(`${PLATFORM_API_URL}/api/tokens/generate`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${authToken}` },
       });
@@ -76,22 +83,36 @@ export function OnboardingGuide({ authToken }: OnboardingGuideProps) {
     }
   };
 
-  const handleCopy = (text: string) => {
+  const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopied(id);
+    setTimeout(() => setCopied(null), 2000);
   };
 
-  // Use user's personal relay URL if available
   const relayUrl = userInfo?.relayUrl || 'wss://relay.sessioncast.io/ws';
-
-  // Generate a suggested machineId based on platform
   const suggestedMachineId = navigator.platform?.toLowerCase().replace(/\s+/g, '-') || 'my-machine';
 
   const configContent = `# ~/.tmux-remote.yml
 machineId: ${suggestedMachineId}
 relay: ${relayUrl}
 token: ${agentToken || 'loading...'}`;
+
+  const aiPrompt = `Please help me install and configure SessionCast Agent on my machine.
+
+Here is my configuration:
+- Agent Token: ${agentToken || '[YOUR_TOKEN]'}
+- Relay URL: ${relayUrl}
+- Machine ID: ${suggestedMachineId}
+
+Please:
+1. Check if Java 17+ and tmux are installed, install them if not
+2. Clone the repository: https://github.com/devload/tmux-remote-system.git
+3. Build the agent with Maven
+4. Create the config file at ~/.tmux-remote.yml with the above settings
+5. Create a tmux session named 'work'
+6. Start the agent
+
+My OS is: ${selectedOS === 'mac' ? 'macOS' : selectedOS === 'windows' ? 'Windows (WSL)' : 'Linux'}`;
 
   if (loading) {
     return (
@@ -108,7 +129,158 @@ token: ${agentToken || 'loading...'}`;
         <p>{t('noMachines')}</p>
       </div>
 
+      {/* OS Selector */}
+      <div className="os-selector">
+        <button
+          className={`os-btn ${selectedOS === 'mac' ? 'active' : ''}`}
+          onClick={() => setSelectedOS('mac')}
+        >
+          <span className="os-icon">🍎</span> macOS
+        </button>
+        <button
+          className={`os-btn ${selectedOS === 'windows' ? 'active' : ''}`}
+          onClick={() => setSelectedOS('windows')}
+        >
+          <span className="os-icon">🪟</span> Windows
+        </button>
+        <button
+          className={`os-btn ${selectedOS === 'linux' ? 'active' : ''}`}
+          onClick={() => setSelectedOS('linux')}
+        >
+          <span className="os-icon">🐧</span> Linux
+        </button>
+      </div>
+
+      {/* AI Auto-Install Section */}
+      <div className="ai-install-section">
+        <div className="ai-header">
+          <span className="ai-icon">🤖</span>
+          <h3>{t('aiInstallTitle')}</h3>
+        </div>
+        <p className="ai-desc">{t('aiInstallDesc')}</p>
+        <div className="ai-prompt-block">
+          <pre>{aiPrompt}</pre>
+          <button
+            className="copy-btn"
+            onClick={() => handleCopy(aiPrompt, 'ai-prompt')}
+          >
+            {copied === 'ai-prompt' ? t('copied') : t('copyPrompt')}
+          </button>
+        </div>
+        <div className="ai-tools">
+          <span className="ai-tool-label">{t('compatibleWith')}</span>
+          <span className="ai-tool">Claude Code</span>
+          <span className="ai-tool">Gemini</span>
+          <span className="ai-tool">ChatGPT</span>
+          <span className="ai-tool">Cursor</span>
+        </div>
+      </div>
+
+      <div className="divider">
+        <span>{t('orManualInstall')}</span>
+      </div>
+
       <div className="setup-steps">
+        {/* Step 0: Prerequisites */}
+        <div className="step prerequisite-step">
+          <div className="step-number">0</div>
+          <div className="step-content">
+            <h3>{t('prerequisitesTitle')}</h3>
+            <p>{t('prerequisitesDesc')}</p>
+
+            <div className="prereq-grid">
+              <div className="prereq-item">
+                <div className="prereq-header">
+                  <span className="prereq-icon">☕</span>
+                  <strong>Java 17+</strong>
+                </div>
+                {selectedOS === 'mac' && (
+                  <div className="code-block">
+                    <code>brew install openjdk@17</code>
+                  </div>
+                )}
+                {selectedOS === 'windows' && (
+                  <div className="code-block">
+                    <code># WSL/Ubuntu</code>
+                    <code>sudo apt update && sudo apt install openjdk-17-jdk</code>
+                  </div>
+                )}
+                {selectedOS === 'linux' && (
+                  <div className="code-block">
+                    <code># Ubuntu/Debian</code>
+                    <code>sudo apt update && sudo apt install openjdk-17-jdk</code>
+                    <code></code>
+                    <code># RHEL/CentOS</code>
+                    <code>sudo dnf install java-17-openjdk-devel</code>
+                  </div>
+                )}
+              </div>
+
+              <div className="prereq-item">
+                <div className="prereq-header">
+                  <span className="prereq-icon">📟</span>
+                  <strong>tmux</strong>
+                </div>
+                {selectedOS === 'mac' && (
+                  <div className="code-block">
+                    <code>brew install tmux</code>
+                  </div>
+                )}
+                {selectedOS === 'windows' && (
+                  <div className="code-block">
+                    <code># WSL/Ubuntu</code>
+                    <code>sudo apt update && sudo apt install tmux</code>
+                  </div>
+                )}
+                {selectedOS === 'linux' && (
+                  <div className="code-block">
+                    <code># Ubuntu/Debian</code>
+                    <code>sudo apt update && sudo apt install tmux</code>
+                    <code></code>
+                    <code># RHEL/CentOS</code>
+                    <code>sudo dnf install tmux</code>
+                  </div>
+                )}
+              </div>
+
+              {selectedOS === 'mac' && (
+                <div className="prereq-item full-width">
+                  <div className="prereq-header">
+                    <span className="prereq-icon">🍺</span>
+                    <strong>Homebrew ({t('ifNotInstalled')})</strong>
+                  </div>
+                  <div className="code-block">
+                    <code>/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</code>
+                  </div>
+                </div>
+              )}
+
+              {selectedOS === 'windows' && (
+                <div className="prereq-item full-width">
+                  <div className="prereq-header">
+                    <span className="prereq-icon">🐧</span>
+                    <strong>WSL2 ({t('required')})</strong>
+                  </div>
+                  <div className="code-block">
+                    <code># PowerShell (Administrator)</code>
+                    <code>wsl --install</code>
+                  </div>
+                  <p className="prereq-note">{t('wslNote')}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="verify-commands">
+              <p className="verify-label">{t('verifyInstall')}</p>
+              <div className="code-block">
+                <code>java -version</code>
+                <code>tmux -V</code>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Step 1: Clone & Build */}
         <div className="step">
           <div className="step-number">1</div>
           <div className="step-content">
@@ -122,6 +294,7 @@ token: ${agentToken || 'loading...'}`;
           </div>
         </div>
 
+        {/* Step 2: Config */}
         <div className="step">
           <div className="step-number">2</div>
           <div className="step-content">
@@ -131,9 +304,9 @@ token: ${agentToken || 'loading...'}`;
               <pre>{configContent}</pre>
               <button
                 className="copy-btn"
-                onClick={() => handleCopy(configContent)}
+                onClick={() => handleCopy(configContent, 'config')}
               >
-                {copied ? t('copied') : t('copy')}
+                {copied === 'config' ? t('copied') : t('copy')}
               </button>
             </div>
             <div className="token-info">
@@ -141,9 +314,9 @@ token: ${agentToken || 'loading...'}`;
               <code className="token-value">{agentToken}</code>
               <button
                 className="copy-token-btn"
-                onClick={() => agentToken && handleCopy(agentToken)}
+                onClick={() => agentToken && handleCopy(agentToken, 'token')}
               >
-                {t('copyToken')}
+                {copied === 'token' ? t('copied') : t('copyToken')}
               </button>
             </div>
             {userInfo?.relayAlias && (
@@ -152,15 +325,16 @@ token: ${agentToken || 'loading...'}`;
                 <code className="relay-value">{relayUrl}</code>
                 <button
                   className="copy-relay-btn"
-                  onClick={() => handleCopy(relayUrl)}
+                  onClick={() => handleCopy(relayUrl, 'relay')}
                 >
-                  {t('copy')}
+                  {copied === 'relay' ? t('copied') : t('copy')}
                 </button>
               </div>
             )}
           </div>
         </div>
 
+        {/* Step 3: Create tmux session */}
         <div className="step">
           <div className="step-number">3</div>
           <div className="step-content">
@@ -172,6 +346,7 @@ token: ${agentToken || 'loading...'}`;
           </div>
         </div>
 
+        {/* Step 4: Run Agent */}
         <div className="step">
           <div className="step-number">4</div>
           <div className="step-content">
@@ -181,6 +356,13 @@ token: ${agentToken || 'loading...'}`;
               <code>java -jar target/host-agent-1.0.0.jar</code>
             </div>
             <p className="hint">{t('step4Hint')}</p>
+
+            <div className="background-tip">
+              <strong>{t('runInBackground')}</strong>
+              <div className="code-block">
+                <code>nohup java -jar target/host-agent-1.0.0.jar &gt; agent.log 2&gt;&amp;1 &amp;</code>
+              </div>
+            </div>
           </div>
         </div>
       </div>
