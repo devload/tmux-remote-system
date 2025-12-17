@@ -6,10 +6,10 @@ server:
       remote-ip-header: X-Forwarded-For
       protocol-header: X-Forwarded-Proto
     threads:
-      max: 200
-      min-spare: 10
-    max-connections: 500
-    accept-count: 100
+      max: 400
+      min-spare: 20
+    max-connections: 10000
+    accept-count: 1000
     connection-timeout: 20000
 
 spring:
@@ -42,11 +42,27 @@ platform:
   api:
     url: ${PLATFORM_API_URL:https://api.sessioncast.io}
 
+aws:
+  region: ${AWS_REGION:ap-northeast-2}
+
+dynamodb:
+  table:
+    sessions: ${DYNAMODB_TABLE_SESSIONS:sessioncast-sessions}
+
 gemini:
   api:
     key: ${GEMINI_API_KEY:}
     url: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent
     timeout-seconds: 30
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
 
 logging:
   level:
