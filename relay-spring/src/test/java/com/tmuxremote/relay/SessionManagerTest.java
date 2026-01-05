@@ -2,6 +2,7 @@ package com.tmuxremote.relay;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tmuxremote.relay.dto.SessionInfo;
+import com.tmuxremote.relay.repository.SessionRepository;
 import com.tmuxremote.relay.service.SessionManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,6 +11,7 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -19,12 +21,15 @@ class SessionManagerTest {
 
     private SessionManager sessionManager;
     private ObjectMapper objectMapper;
+    private SessionRepository sessionRepository;
     private static final String TEST_OWNER = "test@example.com";
 
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        sessionManager = new SessionManager(objectMapper);
+        sessionRepository = mock(SessionRepository.class);
+        when(sessionRepository.findById(anyString())).thenReturn(Optional.empty());
+        sessionManager = new SessionManager(objectMapper, sessionRepository);
     }
 
     @Test

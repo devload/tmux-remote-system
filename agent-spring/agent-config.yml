@@ -1,0 +1,4 @@
+# ~/.tmux-remote.yml
+machineId: MacIntel
+relay: wss://1chk3l29.relay.sessioncast.io/ws
+token: agt_SyNni-4USvOVNbaokYB9un1oZI02WoDfJZJlqOh317I

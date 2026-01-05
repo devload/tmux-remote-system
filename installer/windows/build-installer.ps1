@@ -30,7 +30,7 @@ $Config = @{
             ExtractTo = 'packages\itmux'
         }
         Java = @{
-            Url = 'https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.9%2B9/OpenJDK17U-jre_x64_windows_hotspot_17.0.9_9.zip'
+            Url = 'https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.17%2B10/OpenJDK17U-jre_x64_windows_hotspot_17.0.17_10.zip'
             File = 'java.zip'
             ExtractTo = 'packages\java'
         }

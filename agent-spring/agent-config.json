@@ -1,6 +1,6 @@
 {
   "machineId": "devload-mac",
-  "relay": "wss://tmux.devload.io/ws",
+  "relay": "wss://relay.sessioncast.io/ws",
   "token": "",
   "sessions": [
     {
