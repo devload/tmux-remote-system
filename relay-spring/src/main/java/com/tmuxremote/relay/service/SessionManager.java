@@ -4,7 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tmuxremote.relay.dto.Message;
 import com.tmuxremote.relay.dto.SessionInfo;
 import com.tmuxremote.relay.dto.SessionListItem;
-import lombok.RequiredArgsConstructor;
+import com.tmuxremote.relay.dto.SessionRecord;
+import com.tmuxremote.relay.repository.SessionRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.TextMessage;
@@ -14,16 +15,22 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class SessionManager {
 
     private final ObjectMapper objectMapper;
+    private final SessionRepository sessionRepository;
     private final Map<String, SessionInfo> sessions = new ConcurrentHashMap<>();
+
+    public SessionManager(ObjectMapper objectMapper, SessionRepository sessionRepository) {
+        this.objectMapper = objectMapper;
+        this.sessionRepository = sessionRepository;
+    }
     private final Map<String, WebSocketSession> viewerSessionMap = new ConcurrentHashMap<>();
     // viewerId -> ownerEmail (for filtering sessions)
     private final Map<String, String> viewerOwnerMap = new ConcurrentHashMap<>();
@@ -42,12 +49,25 @@ public class SessionManager {
             log.warn("Host already registered for session: {}, replacing", sessionId);
         }
 
-        SessionInfo sessionInfo = SessionInfo.create(sessionId, label, machineId, ownerEmail, wsSession);
+        // Check DynamoDB for existing session metadata (preserves label across restarts)
+        String effectiveLabel = label;
+        Optional<SessionRecord> existingRecord = sessionRepository.findById(sessionId);
+        if (existingRecord.isPresent() && existingRecord.get().getLabel() != null) {
+            // Preserve the label from DynamoDB if it was previously renamed
+            effectiveLabel = existingRecord.get().getLabel();
+            log.info("Restored session label from DynamoDB: session={}, label={}", sessionId, effectiveLabel);
+        }
+
+        SessionInfo sessionInfo = SessionInfo.create(sessionId, effectiveLabel, machineId, ownerEmail, wsSession);
         if (existing != null) {
             sessionInfo.setViewers(existing.getViewers());
         }
         sessions.put(sessionId, sessionInfo);
         offlineTimestamps.remove(sessionId); // Clear offline timestamp when host connects
+
+        // Save to DynamoDB for persistence
+        SessionRecord record = SessionRecord.from(sessionInfo);
+        sessionRepository.save(record);
 
         log.info("Host registered: session={}, machine={}, owner={}", sessionId, machineId, ownerEmail);
         broadcastSessionListToOwner(ownerEmail);
@@ -174,6 +194,9 @@ public class SessionManager {
                 offlineTimestamps.put(sessionId, Instant.now()); // Track offline time
                 log.info("Host disconnected: session={}", sessionId);
 
+                // Update status in DynamoDB
+                sessionRepository.updateStatus(sessionId, "offline");
+
                 broadcastSessionStatus(sessionId, "offline");
                 if (info.getOwnerEmail() != null) {
                     broadcastSessionListToOwner(info.getOwnerEmail());
@@ -201,6 +224,8 @@ public class SessionManager {
                 if (info != null && "offline".equals(info.getStatus())) {
                     sessions.remove(sessionId);
                     offlineTimestamps.remove(sessionId);
+                    // Also remove from DynamoDB
+                    sessionRepository.delete(sessionId);
                     cleaned.incrementAndGet();
                     log.info("Removed stale session: {}", sessionId);
                 }
@@ -260,6 +285,43 @@ public class SessionManager {
             log.debug("Broadcasting {} to {} viewers for session {}", message.getType(), viewerCount, sessionInfo.getId());
         }
         sessionInfo.getViewers().forEach(viewer -> sendMessage(viewer, message));
+    }
+
+    /**
+     * Broadcast message to viewers by session ID
+     */
+    public void broadcastToViewers(String sessionId, Message message) {
+        SessionInfo sessionInfo = sessions.get(sessionId);
+        if (sessionInfo == null) {
+            log.warn("broadcastToViewers: session not found: {}", sessionId);
+            return;
+        }
+        broadcastToViewers(sessionInfo, message);
+    }
+
+    /**
+     * Forward message to session host (agent)
+     */
+    public void forwardToHost(String sessionId, Message message, String ownerEmail) {
+        SessionInfo sessionInfo = sessions.get(sessionId);
+        if (sessionInfo == null) {
+            log.warn("forwardToHost: session not found: {}", sessionId);
+            return;
+        }
+
+        // Verify owner has permission
+        if (ownerEmail != null && !ownerEmail.equals(sessionInfo.getOwnerEmail())) {
+            log.warn("forwardToHost: owner mismatch. expected={}, got={}", sessionInfo.getOwnerEmail(), ownerEmail);
+            return;
+        }
+
+        WebSocketSession hostSession = sessionInfo.getHostSession();
+        if (hostSession == null || !hostSession.isOpen()) {
+            log.warn("forwardToHost: host not connected for session: {}", sessionId);
+            return;
+        }
+
+        sendMessage(hostSession, message);
     }
 
     private void broadcastSessionStatus(String sessionId, String status) {
@@ -395,6 +457,35 @@ public class SessionManager {
                 .build();
         sendMessage(sessionInfo.getHostSession(), killMsg);
         log.info("Forwarded killSession to host: session={}", sessionId);
+    }
+
+    public boolean renameSession(String sessionId, String newLabel, String ownerEmail) {
+        SessionInfo sessionInfo = sessions.get(sessionId);
+        if (sessionInfo == null) {
+            log.warn("renameSession: session not found: {}", sessionId);
+            return false;
+        }
+
+        // Verify ownership
+        if (ownerEmail != null && !ownerEmail.equals(sessionInfo.getOwnerEmail())) {
+            log.warn("renameSession: user {} not authorized for session {} owned by {}",
+                    ownerEmail, sessionId, sessionInfo.getOwnerEmail());
+            return false;
+        }
+
+        String oldLabel = sessionInfo.getLabel();
+        sessionInfo.setLabel(newLabel);
+
+        // Save to DynamoDB for persistence across restarts
+        sessionRepository.updateLabel(sessionId, newLabel);
+
+        log.info("Session renamed: session={}, oldLabel={}, newLabel={}", sessionId, oldLabel, newLabel);
+
+        // Broadcast updated session list to owner
+        if (sessionInfo.getOwnerEmail() != null) {
+            broadcastSessionListToOwner(sessionInfo.getOwnerEmail());
+        }
+        return true;
     }
 
     // ============================================

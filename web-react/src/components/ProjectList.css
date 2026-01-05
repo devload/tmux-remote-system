@@ -1,0 +1,113 @@
+.project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+}
+
+.project-item {
+  background: var(--bg-secondary, #f5f5f5);
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.project-item:hover {
+  background: var(--bg-hover, #e8e8e8);
+}
+
+.project-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.project-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.project-status {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.project-status.status-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.project-status.status-running {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.project-status.status-completed {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.project-details {
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+}
+
+.project-path {
+  font-family: monospace;
+  margin-bottom: 4px;
+}
+
+.project-owner {
+  color: var(--text-tertiary, #888);
+}
+
+.project-list-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-secondary, #666);
+}
+
+.project-list-empty .empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.project-list-empty p {
+  margin: 4px 0;
+}
+
+.project-list-empty .empty-hint {
+  font-size: 12px;
+  margin-top: 16px;
+}
+
+.project-list-empty code {
+  display: block;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--bg-secondary, #f0f0f0);
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: monospace;
+}
+
+/* Dark mode */
+:root:not(.light) .project-item {
+  background: #2a2a2a;
+}
+
+:root:not(.light) .project-item:hover {
+  background: #333;
+}
+
+:root:not(.light) .project-list-empty code {
+  background: #2a2a2a;
+}

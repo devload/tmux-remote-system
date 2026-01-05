@@ -6,6 +6,7 @@ import com.tmuxremote.relay.dto.Message;
 import com.tmuxremote.relay.security.JwtTokenProvider;
 import com.tmuxremote.relay.service.AgentTokenService;
 import com.tmuxremote.relay.service.PlanLimitService;
+import com.tmuxremote.relay.service.ProjectManager;
 import com.tmuxremote.relay.service.RelayAliasService;
 import com.tmuxremote.relay.service.SessionManager;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,7 @@ public class RelayWebSocketHandler extends TextWebSocketHandler {
     private final JwtTokenProvider jwtTokenProvider;
     private final PlanLimitService planLimitService;
     private final InternalApiController internalApiController;
+    private final ProjectManager projectManager;
 
     // sessionId -> ownerEmail (extracted from token)
     private final Map<String, String> sessionOwnerMap = new ConcurrentHashMap<>();
@@ -101,7 +103,26 @@ public class RelayWebSocketHandler extends TextWebSocketHandler {
                 case "createSession" -> handleCreateSession(session, message);
                 case "sessionCreated" -> handleSessionCreated(message);
                 case "killSession" -> handleKillSession(session, message);
+                case "renameSession" -> handleRenameSession(session, message);
                 case "api_response" -> handleApiResponse(message);  // Agent API response
+                // Project-related messages
+                case "registerProject" -> handleRegisterProject(session, message);
+                case "projectStatus" -> handleProjectStatus(message);
+                case "listProjects" -> handleListProjects(session);
+                case "addSource" -> handleAddSource(session, message);
+                case "sourceAdded" -> handleSourceAdded(session, message);
+                case "analyzeMission" -> handleAnalyzeMission(session, message);
+                case "analysisResult" -> handleAnalysisResult(session, message);
+                case "startWorkflow" -> handleStartWorkflow(session, message);
+                case "ping" -> handlePing(session);
+                // File upload messages
+                case "uploadFile" -> handleUploadFile(session, message);
+                case "uploadComplete" -> handleUploadResponse(message, "uploadComplete");
+                case "uploadError" -> handleUploadResponse(message, "uploadError");
+                // AutoPilot messages
+                case "autopilotRequest" -> handleAutopilotRequest(session, message);
+                case "autopilotStatus" -> handleAutopilotResponse(message, "autopilotStatus");
+                case "autopilotResult" -> handleAutopilotResponse(message, "autopilotResult");
                 default -> log.warn("Unknown message type: {}", message.getType());
             }
         } catch (Exception e) {
@@ -128,16 +149,25 @@ public class RelayWebSocketHandler extends TextWebSocketHandler {
             String ownerEmail = null;
             String agentId = agentIdFromMeta;  // Use from meta first, fallback to token validation
             if (agentToken != null) {
-                var agentInfo = agentTokenService.getAgentInfoByToken(agentToken);
-                if (agentInfo.isPresent()) {
-                    ownerEmail = agentInfo.get().email();
-                    // Auto-derive agentId from token if not provided in meta
+                // Dev token bypass for OTE environment
+                if ("dev@localhost".equals(agentToken)) {
+                    ownerEmail = "dev@localhost";
                     if (agentId == null || agentId.isEmpty()) {
-                        agentId = agentInfo.get().agentId();
+                        agentId = "dev-agent";
                     }
+                    log.debug("Using dev token for host registration");
                 } else {
-                    log.warn("Invalid agent token for session: {}", sessionId);
-                    // Allow registration but without owner (for backward compatibility)
+                    var agentInfo = agentTokenService.getAgentInfoByToken(agentToken);
+                    if (agentInfo.isPresent()) {
+                        ownerEmail = agentInfo.get().email();
+                        // Auto-derive agentId from token if not provided in meta
+                        if (agentId == null || agentId.isEmpty()) {
+                            agentId = agentInfo.get().agentId();
+                        }
+                    } else {
+                        log.warn("Invalid agent token for session: {}", sessionId);
+                        // Allow registration but without owner (for backward compatibility)
+                    }
                 }
             }
 
@@ -331,6 +361,21 @@ public class RelayWebSocketHandler extends TextWebSocketHandler {
         sessionManager.forwardKillSession(sessionId, ownerEmail);
     }
 
+    private void handleRenameSession(WebSocketSession session, Message message) {
+        String ownerEmail = extractOwnerFromSession(session);
+        String sessionId = message.getSession();
+        Map<String, String> meta = message.getMeta();
+        String newLabel = meta != null ? meta.get("label") : null;
+
+        if (sessionId == null || newLabel == null || newLabel.trim().isEmpty()) {
+            log.warn("renameSession missing sessionId or label");
+            return;
+        }
+
+        log.info("Rename session request: session={}, newLabel={}, owner={}", sessionId, newLabel, ownerEmail);
+        sessionManager.renameSession(sessionId, newLabel.trim(), ownerEmail);
+    }
+
     private String extractOwnerFromSession(WebSocketSession session) {
         // First check if we already have it cached
         String cached = sessionOwnerMap.get(session.getId());
@@ -340,10 +385,30 @@ public class RelayWebSocketHandler extends TextWebSocketHandler {
 
         // Try to extract from query param
         String token = extractTokenFromSession(session);
-        if (token != null && jwtTokenProvider.validateToken(token)) {
-            String email = jwtTokenProvider.getEmailFromToken(token);
-            sessionOwnerMap.put(session.getId(), email);
-            return email;
+        if (token != null) {
+            // Try JWT validation first
+            if (jwtTokenProvider.validateToken(token)) {
+                String email = jwtTokenProvider.getEmailFromToken(token);
+                sessionOwnerMap.put(session.getId(), email);
+                return email;
+            }
+
+            // Dev token bypass for OTE environment (dev@localhost)
+            if ("dev@localhost".equals(token)) {
+                String devEmail = "dev@localhost";
+                sessionOwnerMap.put(session.getId(), devEmail);
+                log.debug("Owner from dev token: {}", devEmail);
+                return devEmail;
+            }
+
+            // Fallback: try agent token service
+            var agentInfo = agentTokenService.getAgentInfoByToken(token);
+            if (agentInfo.isPresent()) {
+                String email = agentInfo.get().email();
+                sessionOwnerMap.put(session.getId(), email);
+                log.debug("Owner from agent token: {}", email);
+                return email;
+            }
         }
         return null;
     }
@@ -435,11 +500,287 @@ public class RelayWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
+    // ===================== Project Handlers =====================
+
+    private void handleRegisterProject(WebSocketSession session, Message message) {
+        Map<String, String> meta = message.getMeta();
+        if (meta == null) {
+            log.warn("registerProject missing meta");
+            return;
+        }
+
+        String projectId = meta.get("projectId");
+        String name = meta.get("name");
+        String path = meta.get("path");
+        String ownerEmail = meta.get("ownerEmail");
+
+        // Try to get token from meta (CLI sends it there)
+        String token = meta.get("token");
+        log.debug("registerProject: projectId={}, meta.token={}, meta.ownerEmail={}", projectId, token, ownerEmail);
+
+        // If ownerEmail is null, try to get from token in meta
+        if (ownerEmail == null && token != null) {
+            if ("dev@localhost".equals(token)) {
+                ownerEmail = "dev@localhost";
+            } else if (jwtTokenProvider.validateToken(token)) {
+                ownerEmail = jwtTokenProvider.getEmailFromToken(token);
+            } else {
+                var agentInfo = agentTokenService.getAgentInfoByToken(token);
+                if (agentInfo.isPresent()) {
+                    ownerEmail = agentInfo.get().email();
+                }
+            }
+        }
+
+        // If still null, try from session query param
+        if (ownerEmail == null) {
+            String sessionToken = extractTokenFromSession(session);
+            log.debug("registerProject: sessionToken={}", sessionToken);
+            if ("dev@localhost".equals(sessionToken)) {
+                ownerEmail = "dev@localhost";
+            }
+        }
+
+        if (projectId == null || ownerEmail == null) {
+            log.warn("registerProject missing required fields: projectId={}, owner={}", projectId, ownerEmail);
+            return;
+        }
+
+        projectManager.registerProject(session, projectId, name, path, ownerEmail, meta);
+        log.info("Project registered: id={}, name={}, owner={}", projectId, name, ownerEmail);
+    }
+
+    private void handleProjectStatus(Message message) {
+        Map<String, String> meta = message.getMeta();
+        if (meta == null) return;
+
+        String projectId = meta.get("projectId");
+        String status = meta.get("status");
+
+        if (projectId == null || status == null) {
+            log.warn("projectStatus missing required fields");
+            return;
+        }
+
+        projectManager.updateProjectStatus(projectId, status, meta);
+    }
+
+    private void handleListProjects(WebSocketSession session) {
+        String ownerEmail = extractOwnerFromSession(session);
+        if (ownerEmail == null) {
+            log.warn("Cannot list projects: owner not found for session {}", session.getId());
+            // Send empty list
+            try {
+                String json = objectMapper.writeValueAsString(Map.of(
+                        "type", "projectList",
+                        "payload", "[]"
+                ));
+                synchronized (session) {
+                    if (session.isOpen()) {
+                        session.sendMessage(new TextMessage(json));
+                    }
+                }
+            } catch (IOException e) {
+                log.error("Failed to send empty project list", e);
+            }
+            return;
+        }
+
+        projectManager.sendProjectList(session, ownerEmail);
+    }
+
+    private void handleAddSource(WebSocketSession session, Message message) {
+        Map<String, String> meta = message.getMeta();
+        if (meta == null) return;
+
+        String projectId = meta.get("projectId");
+        String ownerEmail = extractOwnerFromSession(session);
+
+        if (projectId == null || ownerEmail == null) {
+            log.warn("addSource missing projectId or owner");
+            return;
+        }
+
+        projectManager.forwardAddSource(projectId, ownerEmail, meta, session);
+    }
+
+    private void handleSourceAdded(WebSocketSession session, Message message) {
+        // CLI -> Relay -> Viewer: Forward source added result
+        Map<String, String> meta = message.getMeta();
+        if (meta == null) return;
+
+        String projectId = meta.get("projectId");
+        if (projectId == null) return;
+
+        // Update project with new source info
+        projectManager.updateProjectStatus(projectId, "pending", meta);
+
+        // Broadcast to all viewers who own this project
+        String ownerEmail = meta.get("ownerEmail");
+        if (ownerEmail != null) {
+            // For simplicity, just send updated project list
+            // In a more complete implementation, we'd track viewer sessions
+            log.info("Source added to project {}: {}", projectId, meta.get("folder"));
+        }
+    }
+
+    private void handleAnalyzeMission(WebSocketSession session, Message message) {
+        Map<String, String> meta = message.getMeta();
+        if (meta == null) return;
+
+        String projectId = meta.get("projectId");
+        String ownerEmail = extractOwnerFromSession(session);
+
+        if (projectId == null || ownerEmail == null) {
+            log.warn("analyzeMission missing projectId or owner");
+            return;
+        }
+
+        projectManager.forwardAnalyzeMission(projectId, ownerEmail, meta, session);
+    }
+
+    private void handleAnalysisResult(WebSocketSession session, Message message) {
+        // CLI -> Relay -> Viewer: Forward analysis result
+        Map<String, String> meta = message.getMeta();
+        if (meta == null) return;
+
+        String viewerSessionId = meta.get("viewerSessionId");
+        if (viewerSessionId == null) {
+            log.warn("analysisResult missing viewerSessionId");
+            return;
+        }
+
+        // Find viewer session and forward the result
+        // For simplicity, broadcast to project owner's sessions
+        try {
+            String json = objectMapper.writeValueAsString(message);
+            // TODO: Send to specific viewer session
+            log.info("Analysis result received for viewer: {}", viewerSessionId);
+        } catch (IOException e) {
+            log.error("Failed to forward analysis result", e);
+        }
+    }
+
+    private void handleStartWorkflow(WebSocketSession session, Message message) {
+        Map<String, String> meta = message.getMeta();
+        if (meta == null) return;
+
+        String projectId = meta.get("projectId");
+        String ownerEmail = extractOwnerFromSession(session);
+
+        if (projectId == null || ownerEmail == null) {
+            log.warn("startWorkflow missing projectId or owner");
+            return;
+        }
+
+        projectManager.forwardStartWorkflow(projectId, ownerEmail, meta, session);
+    }
+
+    private void handlePing(WebSocketSession session) {
+        try {
+            String json = objectMapper.writeValueAsString(Map.of("type", "pong"));
+            synchronized (session) {
+                if (session.isOpen()) {
+                    session.sendMessage(new TextMessage(json));
+                }
+            }
+        } catch (IOException e) {
+            log.error("Failed to send pong", e);
+        }
+    }
+
+    /**
+     * Handle file upload from viewer - forward to session host (agent)
+     */
+    private void handleUploadFile(WebSocketSession session, Message message) {
+        String sessionId = message.getSession();
+        String ownerEmail = extractOwnerFromSession(session);
+
+        if (sessionId == null) {
+            log.warn("uploadFile missing sessionId");
+            return;
+        }
+
+        Map<String, String> meta = message.getMeta();
+        if (meta == null) {
+            log.warn("uploadFile missing meta");
+            return;
+        }
+
+        log.info("Upload file request: session={}, filename={}, chunk={}/{}, owner={}",
+                sessionId, meta.get("filename"), meta.get("chunkIndex"), meta.get("totalChunks"), ownerEmail);
+
+        // Forward upload message to the session host (agent)
+        sessionManager.forwardToHost(sessionId, message, ownerEmail);
+    }
+
+    /**
+     * Handle upload response from agent - forward to viewer
+     */
+    private void handleUploadResponse(Message message, String responseType) {
+        String sessionId = message.getSession();
+        if (sessionId == null) {
+            log.warn("{} missing sessionId", responseType);
+            return;
+        }
+
+        Map<String, String> meta = message.getMeta();
+        log.info("Upload response: type={}, session={}, filename={}",
+                responseType, sessionId, meta != null ? meta.get("filename") : "unknown");
+
+        // Forward response to all viewers of this session
+        sessionManager.broadcastToViewers(sessionId, message);
+    }
+
+    /**
+     * Handle autopilot request from viewer - forward to session host (agent)
+     */
+    private void handleAutopilotRequest(WebSocketSession session, Message message) {
+        String sessionId = message.getSession();
+        String ownerEmail = extractOwnerFromSession(session);
+
+        if (sessionId == null) {
+            log.warn("autopilotRequest missing sessionId");
+            return;
+        }
+
+        Map<String, String> meta = message.getMeta();
+        if (meta == null) {
+            log.warn("autopilotRequest missing meta");
+            return;
+        }
+
+        log.info("AutoPilot request: session={}, prompt={}, quick={}, owner={}",
+                sessionId, meta.get("prompt"), meta.get("quick"), ownerEmail);
+
+        // Forward autopilot request to the session host (agent)
+        sessionManager.forwardToHost(sessionId, message, ownerEmail);
+    }
+
+    /**
+     * Handle autopilot response from agent - forward to viewers
+     */
+    private void handleAutopilotResponse(Message message, String responseType) {
+        String sessionId = message.getSession();
+        if (sessionId == null) {
+            log.warn("{} missing sessionId", responseType);
+            return;
+        }
+
+        Map<String, String> meta = message.getMeta();
+        log.info("AutoPilot response: type={}, session={}, phase={}",
+                responseType, sessionId, meta != null ? meta.get("phase") : "unknown");
+
+        // Forward response to all viewers of this session
+        sessionManager.broadcastToViewers(sessionId, message);
+    }
+
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         log.info("WebSocket disconnected: id={}, status={}", session.getId(), status);
         sessionManager.handleDisconnect(session);
         sessionManager.handleAgentDisconnect(session);
+        projectManager.handleDisconnect(session);
         sessionOwnerMap.remove(session.getId());
         sessionTokenMap.remove(session.getId());
     }

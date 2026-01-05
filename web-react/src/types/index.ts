@@ -23,3 +23,14 @@ export interface PlanLimitError {
   messageEn: string;
   upgradeUrl: string;
 }
+
+export interface ProjectInfo {
+  projectId: string;
+  name: string;
+  path: string;
+  status: string;
+  mission?: string;
+  sources?: Array<{ folder: string; fileCount: number }>;
+  agents?: Array<{ id: string; name: string; status: string }>;
+  createdAt: string;
+}

@@ -1,0 +1,132 @@
+.file-upload-container {
+  padding: 8px;
+}
+
+.file-upload-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  border: 2px dashed var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--bg-tertiary);
+  min-height: 80px;
+}
+
+.file-upload-dropzone:hover:not(.disabled) {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.file-upload-dropzone.dragging {
+  border-color: var(--accent);
+  background: rgba(16, 163, 127, 0.1);
+  border-style: solid;
+}
+
+.file-upload-dropzone.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.upload-icon {
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.file-upload-dropzone:hover:not(.disabled) .upload-icon,
+.file-upload-dropzone.dragging .upload-icon {
+  color: var(--accent);
+}
+
+.upload-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.upload-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.upload-list {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.upload-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.upload-filename {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.upload-progress-bar {
+  flex: 1;
+  max-width: 100px;
+  height: 4px;
+  background: var(--bg-tertiary);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.upload-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+
+.upload-status-icon {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.upload-status-icon.success {
+  color: var(--accent);
+}
+
+.upload-status-icon.error {
+  color: var(--danger);
+  cursor: help;
+}
+
+.upload-item.complete {
+  background: rgba(16, 163, 127, 0.1);
+}
+
+.upload-item.error {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* Mobile optimization */
+@media (max-width: 768px) {
+  .file-upload-dropzone {
+    padding: 12px;
+    min-height: 60px;
+  }
+
+  .upload-text span:first-child {
+    font-size: 12px;
+  }
+}

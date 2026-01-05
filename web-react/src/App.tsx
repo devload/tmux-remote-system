@@ -10,16 +10,36 @@ import { AgentApiSettings } from './components/AgentApiSettings';
 import { OnboardingGuide } from './components/OnboardingGuide';
 import { UpgradeDialog } from './components/UpgradeDialog';
 import { AdModal } from './components/AdModal';
+import { AutoPilot, AutoPilotStatus, AutoPilotResult } from './components/AutoPilot';
 import { useWebSocket } from './hooks/useWebSocket';
-import { PlanLimitError, SessionInfo } from './types';
+import { PlanLimitError, ProjectInfo, SessionInfo } from './types';
+import { ProjectList } from './components/ProjectList';
 import './App.css';
 
+// OTE environment detection
+const IS_OTE = window.location.hostname === '15.164.214.74' || window.location.hostname === '43.200.173.78' || window.location.hostname.includes('ote.');
+const OTE_DEV_TOKEN = 'dev@localhost'; // Auto-login token for OTE
+
 const PLATFORM_API_URL = import.meta.env.VITE_PLATFORM_API_URL || import.meta.env.VITE_API_URL || '';
-const DEFAULT_WS_BASE = import.meta.env.VITE_WS_URL || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
-const DEFAULT_WS_URL = `${DEFAULT_WS_BASE}/ws`;
+
+// For OTE, always use local WebSocket regardless of env variables
+// This is necessary because .env.production sets VITE_WS_URL to production relay
+const LOCAL_WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
+const PROD_WS_BASE = import.meta.env.VITE_WS_URL || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
+const DEFAULT_WS_URL = IS_OTE ? LOCAL_WS_URL : `${PROD_WS_BASE}/ws`;
+
+// Debug logging for OTE mode (can be removed in production)
+if (IS_OTE) {
+  console.log('[OTE] Using local WebSocket:', DEFAULT_WS_URL);
+}
 
 function App() {
   const [authToken, setAuthToken] = useState<string | null>(() => {
+    // OTE: Auto-login with dev token
+    if (IS_OTE) {
+      console.log('[OTE] Auto-login enabled with dev token');
+      return OTE_DEV_TOKEN;
+    }
     // Check URL for token (OAuth2 redirect)
     const params = new URLSearchParams(window.location.search);
     const urlToken = params.get('token');
@@ -32,6 +52,8 @@ function App() {
     return localStorage.getItem('auth_token');
   });
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [projects, setProjects] = useState<ProjectInfo[]>([]);
+  const [activeTab, setActiveTab] = useState<'sessions' | 'projects'>('sessions');
   const [currentSession, setCurrentSession] = useState<string | null>(null);
   const currentSessionRef = useRef<string | null>(null);
   const [wsUrl, setWsUrl] = useState<string | null>(null);
@@ -58,6 +80,16 @@ function App() {
   useEffect(() => {
     if (!authToken) {
       setWsUrl(null);
+      return;
+    }
+
+    // OTE: Skip user info fetch, use defaults
+    if (IS_OTE) {
+      console.log('[OTE] Skipping user info fetch, using local WebSocket');
+      setUserName('OTE Developer');
+      setOnboardingCompleted(true);
+      setUserPlan('pro'); // No ads on OTE
+      setWsUrl(DEFAULT_WS_URL);
       return;
     }
 
@@ -129,6 +161,8 @@ function App() {
     const saved = localStorage.getItem('hidden_sessions');
     return saved ? new Set(JSON.parse(saved)) : new Set();
   });
+  const [autopilotStatus, setAutopilotStatus] = useState<AutoPilotStatus | null>(null);
+  const [autopilotResult, setAutopilotResult] = useState<AutoPilotResult | null>(null);
 
   const handleScreen = useCallback((sessionId: string, data: string) => {
     // Use ref to always get current session value
@@ -161,13 +195,36 @@ function App() {
     setPlanLimitError(error);
   }, []);
 
-  const { status, joinSession, sendKeys, createSession, sendResize, killSession } = useWebSocket({
+  const handleProjectList = useCallback((newProjects: ProjectInfo[]) => {
+    console.log('[App] Received projects:', newProjects);
+    setProjects(newProjects);
+  }, []);
+
+  const handleAutoPilotStatus = useCallback((status: AutoPilotStatus) => {
+    console.log('[App] AutoPilot status:', status);
+    setAutopilotStatus(status);
+  }, []);
+
+  const handleAutoPilotResult = useCallback((result: AutoPilotResult) => {
+    console.log('[App] AutoPilot result:', result);
+    setAutopilotResult(result);
+    if (result.success) {
+      setAutopilotStatus({ phase: 'ready', message: '워크플로우가 생성되었습니다.' });
+    } else {
+      setAutopilotStatus({ phase: 'error', message: result.error || '오류가 발생했습니다.' });
+    }
+  }, []);
+
+  const { status, joinSession, sendKeys, createSession, sendResize, killSession, renameSession, autopilotRequest } = useWebSocket({
     url: wsUrl || '',
     token: authToken,
     onScreen: handleScreen,
     onSessionList: handleSessionList,
     onSessionStatus: handleSessionStatus,
     onPlanLimitError: handlePlanLimitError,
+    onProjectList: handleProjectList,
+    onAutoPilotStatus: handleAutoPilotStatus,
+    onAutoPilotResult: handleAutoPilotResult,
   });
 
   const handleCreateSession = useCallback((machineId: string, sessionName: string) => {
@@ -177,6 +234,10 @@ function App() {
   const handleKillSession = useCallback((sessionId: string) => {
     killSession(sessionId);
   }, [killSession]);
+
+  const handleRenameSession = useCallback((sessionId: string, newLabel: string) => {
+    renameSession(sessionId, newLabel);
+  }, [renameSession]);
 
   const handleHideSession = useCallback((sessionId: string) => {
     setHiddenSessions(prev => {
@@ -227,6 +288,16 @@ function App() {
     sendKeys(sessionId, data);
   }, [sendKeys]);
 
+  const handleAutoPilotExecute = useCallback((prompt: string, options: { quick?: boolean; speckit?: boolean }) => {
+    // Reset previous results
+    setAutopilotResult(null);
+    setAutopilotStatus({ phase: 'detecting', message: '분석 시작...' });
+
+    // Use current session if available, otherwise use a placeholder
+    const sessionId = currentSession || 'autopilot';
+    autopilotRequest(sessionId, prompt, { quick: options.quick, speckit: options.speckit });
+  }, [currentSession, autopilotRequest]);
+
   const currentSessionInfo = sessions.find(s => s.id === currentSession);
 
   // Show login page if not authenticated
@@ -272,24 +343,45 @@ function App() {
         onClick={() => setSidebarOpen(false)}
       />
 
-      <SessionList
-        sessions={visibleSessions}
-        currentSession={currentSession}
-        onSelectSession={handleSelectSession}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-        onLogout={handleLogout}
-        onManageTokens={() => setShowTokenManager(true)}
-        isOpen={sidebarOpen}
-        onCreateSession={handleCreateSession}
-        onKillSession={handleKillSession}
-        onHideSession={handleHideSession}
-        updatedSessions={updatedSessions}
-        showAd={isFreePlan}
-        onUpgrade={() => window.open('/pricing', '_blank')}
-        authToken={authToken || undefined}
-        userName={userName}
-      />
+      <div className={`sidebar-container ${sidebarOpen ? 'open' : ''}`}>
+        <div className="sidebar-tabs">
+          <button
+            className={`sidebar-tab ${activeTab === 'sessions' ? 'active' : ''}`}
+            onClick={() => setActiveTab('sessions')}
+          >
+            Sessions
+          </button>
+          <button
+            className={`sidebar-tab ${activeTab === 'projects' ? 'active' : ''}`}
+            onClick={() => setActiveTab('projects')}
+          >
+            Projects ({projects.length})
+          </button>
+        </div>
+        {activeTab === 'sessions' ? (
+          <SessionList
+            sessions={visibleSessions}
+            currentSession={currentSession}
+            onSelectSession={handleSelectSession}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            onLogout={handleLogout}
+            onManageTokens={() => setShowTokenManager(true)}
+            isOpen={true}
+            onCreateSession={handleCreateSession}
+            onKillSession={handleKillSession}
+            onHideSession={handleHideSession}
+            onRenameSession={handleRenameSession}
+            updatedSessions={updatedSessions}
+            showAd={isFreePlan}
+            onUpgrade={() => window.open('/pricing', '_blank')}
+            authToken={authToken || undefined}
+            userName={userName}
+          />
+        ) : (
+          <ProjectList projects={projects} />
+        )}
+      </div>
       {showTokenManager && authToken && (
         <TokenManager
           authToken={authToken}
@@ -323,6 +415,12 @@ function App() {
         onUpgrade={() => window.open('/pricing', '_blank')}
       />
       <div className="main-content">
+        <AutoPilot
+          onExecute={handleAutoPilotExecute}
+          disabled={status !== 'connected'}
+          status={autopilotStatus}
+          result={autopilotResult}
+        />
         {visibleSessions.length === 0 ? (
           <OnboardingGuide authToken={authToken} />
         ) : (

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { SessionInfo } from '../types';
 import { useLanguage } from '../i18n';
 import { AdBanner } from './AdBanner';
@@ -16,6 +16,7 @@ interface SessionListProps {
   onCreateSession?: (machineId: string, sessionName: string) => void;
   onKillSession?: (sessionId: string) => void;
   onHideSession?: (sessionId: string) => void;
+  onRenameSession?: (sessionId: string, newLabel: string) => void;
   updatedSessions?: Set<string>;
   showAd?: boolean;
   onUpgrade?: () => void;
@@ -25,11 +26,24 @@ interface SessionListProps {
 
 const ACCOUNT_URL = import.meta.env.VITE_ACCOUNT_URL || 'https://account.sessioncast.io';
 
-export function SessionList({ sessions, currentSession, onSelectSession, theme, onToggleTheme, onLogout, onManageTokens, isOpen, onCreateSession, onKillSession, onHideSession, updatedSessions, showAd, onUpgrade, authToken, userName }: SessionListProps) {
+export function SessionList({ sessions, currentSession, onSelectSession, theme, onToggleTheme, onLogout, onManageTokens, isOpen, onCreateSession, onKillSession, onHideSession, onRenameSession, updatedSessions, showAd, onUpgrade, authToken, userName }: SessionListProps) {
   const { t, lang, setLang } = useLanguage();
   const [creatingForMachine, setCreatingForMachine] = useState<string | null>(null);
   const [newSessionName, setNewSessionName] = useState('');
   const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null);
+  const [renamingSession, setRenamingSession] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (menuOpenFor && !target.closest('.session-menu-container')) {
+        setMenuOpenFor(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [menuOpenFor]);
 
   const handleAccountSettings = () => {
     if (authToken) {
@@ -83,6 +97,30 @@ export function SessionList({ sessions, currentSession, onSelectSession, theme, 
     e.stopPropagation();
     onHideSession?.(sessionId);
     setMenuOpenFor(null);
+  };
+
+  const handleStartRename = (e: React.MouseEvent, session: SessionInfo) => {
+    e.stopPropagation();
+    setRenamingSession(session.id);
+    setRenameValue(session.label || session.id);
+    setMenuOpenFor(null);
+  };
+
+  const handleRename = (sessionId: string) => {
+    if (renameValue.trim() && onRenameSession) {
+      onRenameSession(sessionId, renameValue.trim());
+    }
+    setRenamingSession(null);
+    setRenameValue('');
+  };
+
+  const handleRenameKeyDown = (e: React.KeyboardEvent, sessionId: string) => {
+    if (e.key === 'Enter') {
+      handleRename(sessionId);
+    } else if (e.key === 'Escape') {
+      setRenamingSession(null);
+      setRenameValue('');
+    }
   };
 
   return (
@@ -143,16 +181,30 @@ export function SessionList({ sessions, currentSession, onSelectSession, theme, 
             {machineSessions.map((session) => {
               const hasUpdate = updatedSessions?.has(session.id) && currentSession !== session.id;
               const isMenuOpen = menuOpenFor === session.id;
+              const isRenaming = renamingSession === session.id;
               return (
                 <div
                   key={session.id}
                   className={`session-item ${currentSession === session.id ? 'active' : ''} ${hasUpdate ? 'has-update' : ''}`}
-                  onClick={() => onSelectSession(session.id)}
+                  onClick={() => !isRenaming && onSelectSession(session.id)}
                 >
                   <span className={`status-dot ${session.status}`} />
-                  <span className="session-label">{session.label || session.id}</span>
+                  {isRenaming ? (
+                    <input
+                      type="text"
+                      className="session-rename-input"
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onKeyDown={(e) => handleRenameKeyDown(e, session.id)}
+                      onBlur={() => handleRename(session.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      autoFocus
+                    />
+                  ) : (
+                    <span className="session-label">{session.label || session.id}</span>
+                  )}
                   {hasUpdate && <span className="update-indicator" />}
-                  {(onKillSession || onHideSession) && (
+                  {(onKillSession || onHideSession || onRenameSession) && !isRenaming && (
                     <div className="session-menu-container">
                       <button
                         className="session-menu-btn"
@@ -163,6 +215,11 @@ export function SessionList({ sessions, currentSession, onSelectSession, theme, 
                       </button>
                       {isMenuOpen && (
                         <div className="session-menu">
+                          {onRenameSession && (
+                            <button onClick={(e) => handleStartRename(e, session)}>
+                              {lang === 'ko' ? '이름 변경' : 'Rename'}
+                            </button>
+                          )}
                           {onHideSession && (
                             <button onClick={(e) => handleHideSession(e, session.id)}>
                               {lang === 'ko' ? '숨기기' : 'Hide'}

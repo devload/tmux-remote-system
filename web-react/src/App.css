@@ -109,6 +109,45 @@ body {
   min-height: 0;
 }
 
+/* Sidebar container with tabs */
+.sidebar-container {
+  display: flex;
+  flex-direction: column;
+  width: 260px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.sidebar-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.sidebar-tab {
+  flex: 1;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sidebar-tab:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.sidebar-tab.active {
+  color: var(--accent);
+  background: var(--bg-tertiary);
+  border-bottom: 2px solid var(--accent);
+  margin-bottom: -1px;
+}
+
 /* Mobile sidebar toggle button */
 .sidebar-toggle {
   display: none;
@@ -194,6 +233,22 @@ body {
     flex-direction: column;
     height: 100%;
     height: calc(var(--vh, 1vh) * 100);
+  }
+
+  .sidebar-container {
+    position: fixed;
+    top: 0;
+    left: -280px;
+    width: 280px;
+    height: 100%;
+    height: calc(var(--vh, 1vh) * 100);
+    max-height: calc(var(--vh, 1vh) * 100);
+    z-index: 1000;
+    transition: left 0.3s ease;
+  }
+
+  .sidebar-container.open {
+    left: 0;
   }
 
   .session-list {

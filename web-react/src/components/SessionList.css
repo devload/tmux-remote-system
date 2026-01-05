@@ -208,6 +208,21 @@
   flex: 1;
 }
 
+.session-rename-input {
+  flex: 1;
+  font-size: 14px;
+  padding: 4px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.session-rename-input:focus {
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+}
+
 .session-item.has-update {
   background-color: var(--bg-update);
 }
