@@ -46,14 +46,28 @@ jobs:
           mkdir -p java-temp
           tar -xzf java.tar.gz -C java-temp
 
+          # Debug: show extracted structure
+          echo "Extracted structure:"
+          find java-temp -maxdepth 3 -type d
+
           # Adoptium JRE for macOS has Contents/Home structure
-          if [[ -d java-temp/*/Contents/Home ]]; then
-            mv java-temp/*/Contents/Home/* SessionCast/java/
+          JAVA_HOME_DIR=$(find java-temp -type d -name "Home" 2>/dev/null | head -1)
+          if [[ -n "$JAVA_HOME_DIR" ]]; then
+            echo "Found Java Home at: $JAVA_HOME_DIR"
+            cp -R "$JAVA_HOME_DIR"/* SessionCast/java/
           else
-            mv java-temp/*/* SessionCast/java/
+            # Fallback: copy from first subdirectory
+            FIRST_DIR=$(find java-temp -mindepth 1 -maxdepth 1 -type d | head -1)
+            echo "Fallback: copying from $FIRST_DIR"
+            cp -R "$FIRST_DIR"/* SessionCast/java/
           fi
 
           rm -rf java-temp java.tar.gz
+
+          # Debug: show Java directory
+          echo "Java directory contents:"
+          ls -la SessionCast/java/
+
           echo "Java version:"
           SessionCast/java/bin/java -version
 
