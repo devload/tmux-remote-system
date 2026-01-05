@@ -25,7 +25,7 @@ $Config = @{
     # Download URLs
     Downloads = @{
         Itmux = @{
-            Url = 'https://github.com/itefixnet/itmux/releases/download/v2.0/itmux-2.0.zip'
+            Url = 'https://github.com/itefixnet/itmux/releases/download/v1.0.5/itmux_1.0.5_x64_free.zip'
             File = 'itmux.zip'
             ExtractTo = 'packages\itmux'
         }
