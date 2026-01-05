@@ -3,6 +3,8 @@ package com.tmuxremote.agent.service;
 import com.tmuxremote.agent.client.ApiWebSocketClient;
 import com.tmuxremote.agent.config.ConfigLoader;
 import com.tmuxremote.agent.dto.AgentConfig;
+import com.tmuxremote.agent.service.tmux.TmuxExecutor;
+import com.tmuxremote.agent.service.tmux.TmuxExecutorFactory;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,18 +23,24 @@ public class AgentRunner implements CommandLineRunner {
 
     private final ConfigLoader configLoader;
     private final TmuxSessionScanner sessionScanner;
+    private final TmuxExecutorFactory tmuxExecutorFactory;
     private final Map<String, TmuxSessionHandler> handlers = new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     private String machineId;
     private String relayUrl;
     private String agentToken;
+    private TmuxExecutor tmuxExecutor;
     private ApiWebSocketClient apiClient;
     private static final long SCAN_INTERVAL_SECONDS = 5;
 
     @Override
     public void run(String... args) throws Exception {
-        log.info("Starting TMUX Remote Host Agent...");
+        log.info("Starting TMUX Remote Host Agent on {}...", TmuxExecutorFactory.getPlatformName());
+
+        // Initialize platform-specific tmux executor
+        this.tmuxExecutor = tmuxExecutorFactory.getExecutor();
+        log.info("TmuxExecutor initialized: {}", tmuxExecutor.getClass().getSimpleName());
 
         AgentConfig config = configLoader.loadConfig();
         this.machineId = config.getMachineId();
@@ -101,7 +109,10 @@ public class AgentRunner implements CommandLineRunner {
         sessionConfig.setTmuxSession(tmuxSession);
         sessionConfig.setLabel(tmuxSession);
 
-        TmuxSessionHandler handler = new TmuxSessionHandler(sessionConfig, machineId, relayUrl, agentToken, this::createTmuxSession);
+        TmuxSessionHandler handler = new TmuxSessionHandler(
+            sessionConfig, machineId, relayUrl, agentToken,
+            this::createTmuxSession, tmuxExecutor
+        );
         handlers.put(tmuxSession, handler);
         handler.start();
 
@@ -125,22 +136,13 @@ public class AgentRunner implements CommandLineRunner {
 
             log.info("Creating new tmux session: {}", sanitized);
 
-            ProcessBuilder pb = new ProcessBuilder(
-                "tmux", "new-session", "-d", "-s", sanitized
-            );
-            pb.redirectErrorStream(true);
-            Process process = pb.start();
+            // Use platform-specific executor
+            tmuxExecutor.createSession(sanitized, null);
+            log.info("Successfully created tmux session: {}", sanitized);
 
-            // Wait and check result
-            boolean completed = process.waitFor(5, TimeUnit.SECONDS);
-            if (completed && process.exitValue() == 0) {
-                log.info("Successfully created tmux session: {}", sanitized);
-                // The session will be auto-discovered by the next scan cycle
-                // Force immediate scan
-                scheduler.execute(this::scanAndUpdateSessions);
-            } else {
-                log.error("Failed to create tmux session: {}, exitCode: {}", sanitized, process.exitValue());
-            }
+            // The session will be auto-discovered by the next scan cycle
+            // Force immediate scan
+            scheduler.execute(this::scanAndUpdateSessions);
         } catch (Exception e) {
             log.error("Error creating tmux session: {}", sessionName, e);
         }

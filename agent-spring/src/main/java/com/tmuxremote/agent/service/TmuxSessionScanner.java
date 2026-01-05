@@ -1,11 +1,10 @@
 package com.tmuxremote.agent.service;
 
+import com.tmuxremote.agent.service.tmux.TmuxExecutor;
+import com.tmuxremote.agent.service.tmux.TmuxExecutorFactory;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -13,36 +12,19 @@ import java.util.Set;
 @Component
 public class TmuxSessionScanner {
 
+    private final TmuxExecutorFactory executorFactory;
+
+    public TmuxSessionScanner(TmuxExecutorFactory executorFactory) {
+        this.executorFactory = executorFactory;
+    }
+
     public Set<String> scanSessions() {
-        Set<String> sessions = new HashSet<>();
         try {
-            ProcessBuilder pb = new ProcessBuilder("tmux", "ls", "-F", "#{session_name}");
-            pb.redirectErrorStream(false);
-            Process process = pb.start();
-
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    String sessionName = line.trim();
-                    if (!sessionName.isEmpty()) {
-                        sessions.add(sessionName);
-                    }
-                }
-            }
-
-            // Consume error stream
-            try (BufferedReader errReader = new BufferedReader(
-                    new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
-                while (errReader.readLine() != null) {
-                    // Discard
-                }
-            }
-
-            process.waitFor();
+            TmuxExecutor executor = executorFactory.getExecutor();
+            return new HashSet<>(executor.listSessions());
         } catch (Exception e) {
             log.error("Failed to scan tmux sessions", e);
+            return new HashSet<>();
         }
-        return sessions;
     }
 }
