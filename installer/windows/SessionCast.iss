@@ -71,7 +71,7 @@ Source: "packages\itmux\*"; DestDir: "{app}\itmux"; Components: core; Flags: ign
 
 ; Java Agent
 Source: "packages\java\*"; DestDir: "{app}\java"; Components: java; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "packages\sessioncast-agent.jar"; DestDir: "{app}\bin"; Components: java; Flags: ignoreversion
+Source: "packages\sessioncast-agent.jar"; DestDir: "{app}\bin"; Components: java; Flags: ignoreversion skipifsourcedoesntexist
 
 ; Node Agent
 Source: "packages\node\*"; DestDir: "{app}\node"; Components: node; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -82,7 +82,7 @@ Source: "scripts\sessioncast-node.cmd"; DestDir: "{app}\bin"; Components: node; 
 Source: "config\agent-config.yml"; DestDir: "{app}\config"; Flags: ignoreversion onlyifdoesntexist
 
 ; Icon
-Source: "icon.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "icon.ico"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 
 [Dirs]
 Name: "{app}\logs"; Permissions: users-modify

@@ -1,0 +1,326 @@
+name: Build Windows Installer
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.0.0)'
+        required: false
+        default: '1.0.0'
+
+env:
+  ITMUX_URL: 'https://github.com/itefixnet/itmux/releases/download/v2.0/itmux-2.0.zip'
+  JAVA_URL: 'https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.9%2B9/OpenJDK17U-jre_x64_windows_hotspot_17.0.9_9.zip'
+  NODE_URL: 'https://nodejs.org/dist/v20.10.0/node-v20.10.0-win-x64.zip'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set version
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "push" -and "${{ github.ref_type }}" -eq "tag") {
+            $version = "${{ github.ref_name }}".TrimStart('v')
+          } else {
+            $version = "${{ github.event.inputs.version }}"
+            if ([string]::IsNullOrEmpty($version)) {
+              $version = "1.0.0"
+            }
+          }
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          echo "Version: $version"
+
+      - name: Create directory structure
+        shell: pwsh
+        run: |
+          $dirs = @(
+            'installer/windows/downloads',
+            'installer/windows/packages/itmux',
+            'installer/windows/packages/java',
+            'installer/windows/packages/node',
+            'installer/windows/scripts',
+            'installer/windows/config',
+            'installer/windows/output'
+          )
+          foreach ($dir in $dirs) {
+            New-Item -ItemType Directory -Path $dir -Force | Out-Null
+            Write-Host "Created: $dir"
+          }
+
+      - name: Download itmux
+        shell: pwsh
+        run: |
+          $outFile = "installer/windows/downloads/itmux.zip"
+          Write-Host "Downloading itmux..."
+          Invoke-WebRequest -Uri $env:ITMUX_URL -OutFile $outFile -UseBasicParsing
+          Write-Host "Extracting itmux..."
+          Expand-Archive -Path $outFile -DestinationPath "installer/windows/packages/itmux" -Force
+
+          # Handle nested directory
+          $nested = Get-ChildItem -Path "installer/windows/packages/itmux" -Directory | Select-Object -First 1
+          if ($nested -and ((Get-ChildItem "installer/windows/packages/itmux" -Directory).Count -eq 1)) {
+            Get-ChildItem -Path $nested.FullName | Move-Item -Destination "installer/windows/packages/itmux" -Force
+            Remove-Item -Path $nested.FullName -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Download Java 17
+        shell: pwsh
+        run: |
+          $outFile = "installer/windows/downloads/java.zip"
+          Write-Host "Downloading Java 17..."
+          Invoke-WebRequest -Uri $env:JAVA_URL -OutFile $outFile -UseBasicParsing
+          Write-Host "Extracting Java..."
+          Expand-Archive -Path $outFile -DestinationPath "installer/windows/packages/java" -Force
+
+          # Handle nested directory
+          $nested = Get-ChildItem -Path "installer/windows/packages/java" -Directory | Select-Object -First 1
+          if ($nested -and ((Get-ChildItem "installer/windows/packages/java" -Directory).Count -eq 1)) {
+            Get-ChildItem -Path $nested.FullName | Move-Item -Destination "installer/windows/packages/java" -Force
+            Remove-Item -Path $nested.FullName -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Download Node.js 20
+        shell: pwsh
+        run: |
+          $outFile = "installer/windows/downloads/node.zip"
+          Write-Host "Downloading Node.js 20..."
+          Invoke-WebRequest -Uri $env:NODE_URL -OutFile $outFile -UseBasicParsing
+          Write-Host "Extracting Node.js..."
+          Expand-Archive -Path $outFile -DestinationPath "installer/windows/packages/node" -Force
+
+          # Handle nested directory
+          $nested = Get-ChildItem -Path "installer/windows/packages/node" -Directory | Select-Object -First 1
+          if ($nested -and ((Get-ChildItem "installer/windows/packages/node" -Directory).Count -eq 1)) {
+            Get-ChildItem -Path $nested.FullName | Move-Item -Destination "installer/windows/packages/node" -Force
+            Remove-Item -Path $nested.FullName -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Create launcher scripts
+        shell: pwsh
+        run: |
+          # Java Agent launcher
+          $javaLauncher = @'
+          @echo off
+          setlocal
+
+          set SESSIONCAST_HOME=%~dp0..
+          set ITMUX_HOME=%SESSIONCAST_HOME%\itmux
+
+          if exist "%SESSIONCAST_HOME%\java\bin\java.exe" (
+              set JAVA_HOME=%SESSIONCAST_HOME%\java
+          ) else if defined JAVA_HOME (
+              rem Use system JAVA_HOME
+          ) else (
+              echo Error: Java not found. Please install Java or set JAVA_HOME.
+              exit /b 1
+          )
+
+          "%JAVA_HOME%\bin\java.exe" -jar "%SESSIONCAST_HOME%\bin\sessioncast-agent.jar" %*
+          '@
+          Set-Content -Path 'installer/windows/scripts/sessioncast-agent.cmd' -Value $javaLauncher.Trim() -Encoding ASCII
+
+          # Node Agent launcher
+          $nodeLauncher = @'
+          @echo off
+          setlocal
+
+          set SESSIONCAST_HOME=%~dp0..
+          set ITMUX_HOME=%SESSIONCAST_HOME%\itmux
+
+          if exist "%SESSIONCAST_HOME%\node\node.exe" (
+              set NODE_HOME=%SESSIONCAST_HOME%\node
+              set PATH=%NODE_HOME%;%PATH%
+          ) else if exist "%ProgramFiles%\nodejs\node.exe" (
+              set NODE_HOME=%ProgramFiles%\nodejs
+          ) else (
+              echo Error: Node.js not found. Please install Node.js.
+              exit /b 1
+          )
+
+          "%NODE_HOME%\npx.cmd" sessioncast %*
+          '@
+          Set-Content -Path 'installer/windows/scripts/sessioncast-node.cmd' -Value $nodeLauncher.Trim() -Encoding ASCII
+
+          Write-Host "Launcher scripts created"
+
+      - name: Create default config
+        shell: pwsh
+        run: |
+          $config = @'
+          # SessionCast Agent Configuration
+
+          # Machine identifier (change to a unique name for your machine)
+          machineId: MY_MACHINE
+
+          # Relay server URL
+          relay: wss://relay.sessioncast.io/ws
+
+          # Authentication token (get from https://app.sessioncast.io)
+          token: YOUR_TOKEN_HERE
+          '@
+          Set-Content -Path 'installer/windows/config/agent-config.yml' -Value $config.Trim() -Encoding UTF8
+
+      - name: Create placeholder files
+        shell: pwsh
+        run: |
+          # LICENSE.txt
+          $license = @"
+          SessionCast License Agreement
+
+          Copyright (c) 2024 SessionCast
+
+          This software is provided for use under the terms of the SessionCast
+          Terms of Service available at https://sessioncast.io/terms
+
+          By installing this software, you agree to these terms.
+          "@
+          Set-Content -Path 'installer/windows/LICENSE.txt' -Value $license
+
+          # README.txt
+          $readme = @"
+          SessionCast Agent for Windows
+
+          This installer will set up the SessionCast Agent on your Windows machine.
+
+          Components:
+          - itmux (Windows tmux environment)
+          - Java Runtime (for Java Agent)
+          - Node.js Runtime (for Node Agent)
+
+          After installation:
+          1. Edit the configuration file at C:\SessionCast\config\agent-config.yml
+          2. Set your authentication token from https://app.sessioncast.io
+          3. Run the agent using sessioncast-agent.cmd or sessioncast-node.cmd
+
+          For more information, visit https://sessioncast.io/docs
+          "@
+          Set-Content -Path 'installer/windows/README.txt' -Value $readme
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          Write-Host "Installing Inno Setup..."
+          choco install innosetup -y --no-progress
+
+          # Add to PATH
+          $innoPath = "C:\Program Files (x86)\Inno Setup 6"
+          echo "$innoPath" >> $env:GITHUB_PATH
+
+      - name: Update version in ISS file
+        shell: pwsh
+        run: |
+          $issFile = "installer/windows/SessionCast.iss"
+          $content = Get-Content $issFile -Raw
+          $content = $content -replace '#define MyAppVersion ".*"', "#define MyAppVersion `"${{ steps.version.outputs.VERSION }}`""
+          Set-Content -Path $issFile -Value $content
+          Write-Host "Updated version to ${{ steps.version.outputs.VERSION }}"
+
+      - name: Build installer with Inno Setup
+        shell: pwsh
+        run: |
+          cd installer/windows
+
+          # Create a simple icon (using PowerShell to create a minimal ICO)
+          # For production, replace with actual icon file
+          if (-not (Test-Path 'icon.ico')) {
+            Copy-Item "$env:SystemRoot\System32\cmd.exe" -Destination 'icon.ico' -ErrorAction SilentlyContinue
+          }
+
+          # Create placeholder wizard images if not exist
+          if (-not (Test-Path 'wizard-large.bmp')) {
+            # Create 164x314 BMP placeholder
+            Add-Type -AssemblyName System.Drawing
+            $bmp = New-Object System.Drawing.Bitmap(164, 314)
+            $g = [System.Drawing.Graphics]::FromImage($bmp)
+            $g.Clear([System.Drawing.Color]::FromArgb(0, 120, 212))
+            $g.Dispose()
+            $bmp.Save("wizard-large.bmp", [System.Drawing.Imaging.ImageFormat]::Bmp)
+            $bmp.Dispose()
+          }
+
+          if (-not (Test-Path 'wizard-small.bmp')) {
+            # Create 55x55 BMP placeholder
+            Add-Type -AssemblyName System.Drawing
+            $bmp = New-Object System.Drawing.Bitmap(55, 55)
+            $g = [System.Drawing.Graphics]::FromImage($bmp)
+            $g.Clear([System.Drawing.Color]::FromArgb(0, 120, 212))
+            $g.Dispose()
+            $bmp.Save("wizard-small.bmp", [System.Drawing.Imaging.ImageFormat]::Bmp)
+            $bmp.Dispose()
+          }
+
+          Write-Host "Building installer..."
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "SessionCast.iss"
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Inno Setup build failed"
+            exit 1
+          }
+
+          Write-Host "Installer built successfully!"
+          Get-ChildItem output/
+
+      - name: Create portable ZIP
+        shell: pwsh
+        run: |
+          cd installer/windows
+
+          $version = "${{ steps.version.outputs.VERSION }}"
+          $zipName = "SessionCast-Portable-$version.zip"
+          $zipTemp = "output/SessionCast"
+
+          # Create temp directory
+          New-Item -ItemType Directory -Path $zipTemp -Force | Out-Null
+
+          # Copy files
+          Copy-Item -Path 'packages/itmux' -Destination "$zipTemp/itmux" -Recurse
+          Copy-Item -Path 'packages/java' -Destination "$zipTemp/java" -Recurse
+          Copy-Item -Path 'packages/node' -Destination "$zipTemp/node" -Recurse
+          New-Item -ItemType Directory -Path "$zipTemp/bin" -Force | Out-Null
+          Copy-Item -Path 'scripts/*' -Destination "$zipTemp/bin"
+          New-Item -ItemType Directory -Path "$zipTemp/config" -Force | Out-Null
+          Copy-Item -Path 'config/*' -Destination "$zipTemp/config"
+          New-Item -ItemType Directory -Path "$zipTemp/logs" -Force | Out-Null
+
+          # Create ZIP
+          Compress-Archive -Path $zipTemp -DestinationPath "output/$zipName" -Force
+          Remove-Item -Recurse -Force $zipTemp
+
+          Write-Host "Portable ZIP created: output/$zipName"
+          Get-ChildItem output/
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SessionCast-Windows-Installer
+          path: installer/windows/output/SessionCast-Setup-*.exe
+          retention-days: 30
+
+      - name: Upload portable ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SessionCast-Windows-Portable
+          path: installer/windows/output/SessionCast-Portable-*.zip
+          retention-days: 30
+
+      - name: Create Release (on tag push)
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            installer/windows/output/SessionCast-Setup-*.exe
+            installer/windows/output/SessionCast-Portable-*.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
