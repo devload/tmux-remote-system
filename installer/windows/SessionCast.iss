@@ -27,7 +27,7 @@ LicenseFile=LICENSE.txt
 InfoBeforeFile=README.txt
 OutputDir=output
 OutputBaseFilename=SessionCast-Setup-{#MyAppVersion}
-SetupIconFile=icon.ico
+; SetupIconFile=icon.ico  ; Uncomment when you have a valid icon file
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -42,7 +42,7 @@ ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
 
 ; Uninstall info
-UninstallDisplayIcon={app}\icon.ico
+; UninstallDisplayIcon={app}\icon.ico  ; Uncomment when you have a valid icon file
 UninstallDisplayName={#MyAppName}
 
 [Languages]
@@ -89,15 +89,15 @@ Name: "{app}\logs"; Permissions: users-modify
 Name: "{app}\config"; Permissions: users-modify
 
 [Icons]
-; Start menu shortcuts
-Name: "{group}\SessionCast Agent (Java)"; Filename: "{app}\bin\sessioncast-agent.cmd"; Components: java; IconFilename: "{app}\icon.ico"
-Name: "{group}\SessionCast Agent (Node)"; Filename: "{app}\bin\sessioncast-node.cmd"; Components: node; IconFilename: "{app}\icon.ico"
+; Start menu shortcuts (using system icons - replace with custom icon.ico when available)
+Name: "{group}\SessionCast Agent (Java)"; Filename: "{app}\bin\sessioncast-agent.cmd"; Components: java; IconFilename: "{sys}\shell32.dll"; IconIndex: 131
+Name: "{group}\SessionCast Agent (Node)"; Filename: "{app}\bin\sessioncast-node.cmd"; Components: node; IconFilename: "{sys}\shell32.dll"; IconIndex: 131
 Name: "{group}\Configuration"; Filename: "{app}\config"; IconFilename: "{sys}\shell32.dll"; IconIndex: 21
 Name: "{group}\Logs"; Filename: "{app}\logs"; IconFilename: "{sys}\shell32.dll"; IconIndex: 20
-Name: "{group}\Uninstall SessionCast"; Filename: "{uninstallexe}"; IconFilename: "{app}\icon.ico"
+Name: "{group}\Uninstall SessionCast"; Filename: "{uninstallexe}"
 
 ; Desktop shortcut
-Name: "{autodesktop}\SessionCast Agent"; Filename: "{app}\bin\sessioncast-agent.cmd"; Tasks: desktopicon; Components: java; IconFilename: "{app}\icon.ico"
+Name: "{autodesktop}\SessionCast Agent"; Filename: "{app}\bin\sessioncast-agent.cmd"; Tasks: desktopicon; Components: java; IconFilename: "{sys}\shell32.dll"; IconIndex: 131
 
 [Registry]
 ; Environment variables
