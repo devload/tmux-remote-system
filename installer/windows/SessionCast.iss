@@ -33,9 +33,9 @@ SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=admin
 
-; Appearance
-WizardImageFile=wizard-large.bmp
-WizardSmallImageFile=wizard-small.bmp
+; Appearance (wizard images are optional - uncomment if you have custom images)
+; WizardImageFile=wizard-large.bmp
+; WizardSmallImageFile=wizard-small.bmp
 
 ; Architecture
 ArchitecturesAllowed=x64
