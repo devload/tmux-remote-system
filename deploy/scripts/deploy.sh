@@ -33,6 +33,35 @@ OTE_HOST="43.200.173.78"
 OTE_USER="ec2-user"
 OTE_SSH_KEY="${OTE_SSH_KEY:-$HOME/.ssh/id_rsa}"
 
+# Production Configuration (AWS)
+AWS_REGION="ap-northeast-2"
+AWS_ACCOUNT_ID="614302797904"
+ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+ECS_CLUSTER="sessioncast-cluster"
+
+# S3 Buckets
+S3_BUCKET_APP="sessioncast-app"
+S3_BUCKET_LANDING="sessioncast-landing"
+S3_BUCKET_ACCOUNT="sessioncast-account"
+
+# CloudFront Distribution IDs
+CF_DIST_APP="E38D03VGND0IZ1"        # app.sessioncast.io
+CF_DIST_LANDING="E2CPMMB96BSG4Q"    # www.sessioncast.io
+CF_DIST_ACCOUNT="E3UU2T345UNN2E"    # account.sessioncast.io
+CF_DIST_MANAGER="E37EZ8I14YBXAO"    # manager.sessioncast.io
+
+# ECR Repositories
+ECR_REPO_RELAY="sessioncast/relay"
+ECR_REPO_PLATFORM="sessioncast/platform-api"
+ECR_REPO_GATEWAY="sessioncast/gateway"
+ECR_REPO_ORCHESTRATOR="sessioncast/orchestrator"
+
+# ECS Services
+ECS_SERVICE_RELAY="sessioncast-relay"
+ECS_SERVICE_PLATFORM="sessioncast-platform"
+ECS_SERVICE_GATEWAY="sessioncast-gateway"
+ECS_SERVICE_ORCHESTRATOR="sessioncast-orchestrator"
+
 # =============================================================================
 # Helper Functions
 # =============================================================================
@@ -173,47 +202,146 @@ EOF
 # Production Deployment Functions (AWS)
 # =============================================================================
 
-deploy_prod_web() {
-    log_step "Deploying Web to Production..."
+ecr_login() {
+    log_step "Logging in to ECR..."
+    aws ecr get-login-password --region "$AWS_REGION" | \
+        docker login --username AWS --password-stdin "$ECR_REGISTRY"
+}
+
+deploy_prod_web_app() {
+    log_step "Deploying Web App to Production (app.sessioncast.io)..."
 
     cd "$PROJECT_ROOT/web-react"
 
     log_step "Building for production..."
+    npm install
     npm run build
 
-    log_step "Syncing to S3..."
-    aws s3 sync dist/ s3://sessioncast-web/ --delete
+    log_step "Syncing to S3 ($S3_BUCKET_APP)..."
+    aws s3 sync dist/ "s3://$S3_BUCKET_APP/" --delete --region "$AWS_REGION"
 
     log_step "Invalidating CloudFront cache..."
     aws cloudfront create-invalidation \
-        --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
+        --distribution-id "$CF_DIST_APP" \
         --paths "/*"
 
-    log_success "Web deployed to Production"
+    log_success "Web App deployed to app.sessioncast.io"
+}
+
+deploy_prod_web_landing() {
+    log_step "Deploying Landing Page to Production (www.sessioncast.io)..."
+
+    cd "$PROJECT_ROOT/landing" 2>/dev/null || {
+        log_error "Landing page project not found"
+        return 1
+    }
+
+    log_step "Building for production..."
+    npm install
+    npm run build
+
+    log_step "Syncing to S3 ($S3_BUCKET_LANDING)..."
+    aws s3 sync dist/ "s3://$S3_BUCKET_LANDING/" --delete --region "$AWS_REGION"
+
+    log_step "Invalidating CloudFront cache..."
+    aws cloudfront create-invalidation \
+        --distribution-id "$CF_DIST_LANDING" \
+        --paths "/*"
+
+    log_success "Landing Page deployed to www.sessioncast.io"
 }
 
 deploy_prod_ecs() {
     local service="$1"
     local repository="$2"
+    local project_dir="$3"
 
     log_step "Deploying $service to Production ECS..."
 
-    # Build and push Docker image
+    if [[ -n "$project_dir" ]]; then
+        cd "$project_dir"
+    fi
+
+    # Login to ECR
+    ecr_login
+
+    # Build Docker image
     log_step "Building Docker image..."
     docker build -t "$repository" .
 
+    # Tag and push
+    local full_image="$ECR_REGISTRY/$repository:latest"
+    log_step "Tagging as $full_image..."
+    docker tag "$repository:latest" "$full_image"
+
     log_step "Pushing to ECR..."
-    aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin "$ECR_REGISTRY"
-    docker tag "$repository:latest" "$ECR_REGISTRY/$repository:latest"
-    docker push "$ECR_REGISTRY/$repository:latest"
+    docker push "$full_image"
 
-    log_step "Updating ECS service..."
+    # Update ECS service
+    log_step "Updating ECS service ($service)..."
     aws ecs update-service \
-        --cluster sessioncast-cluster \
+        --cluster "$ECS_CLUSTER" \
         --service "$service" \
-        --force-new-deployment
+        --force-new-deployment \
+        --region "$AWS_REGION"
 
-    log_success "$service deployed to Production"
+    log_step "Waiting for deployment to stabilize..."
+    aws ecs wait services-stable \
+        --cluster "$ECS_CLUSTER" \
+        --services "$service" \
+        --region "$AWS_REGION" || log_warning "Timeout waiting for service to stabilize"
+
+    log_success "$service deployed to Production ECS"
+}
+
+deploy_prod_relay() {
+    deploy_prod_ecs "$ECS_SERVICE_RELAY" "$ECR_REPO_RELAY" "$PROJECT_ROOT/relay-spring"
+}
+
+deploy_prod_platform() {
+    deploy_prod_ecs "$ECS_SERVICE_PLATFORM" "$ECR_REPO_PLATFORM" "$PROJECT_ROOT/platform"
+}
+
+deploy_prod_gateway() {
+    deploy_prod_ecs "$ECS_SERVICE_GATEWAY" "$ECR_REPO_GATEWAY" "$PROJECT_ROOT/gateway"
+}
+
+deploy_prod_orchestrator() {
+    deploy_prod_ecs "$ECS_SERVICE_ORCHESTRATOR" "$ECR_REPO_ORCHESTRATOR" "$PROJECT_ROOT/orchestrator"
+}
+
+check_prod_status() {
+    log_step "Checking Production Status..."
+
+    echo ""
+    echo -e "${CYAN}=== ECS Services Status ===${NC}"
+    echo ""
+
+    aws ecs describe-services \
+        --cluster "$ECS_CLUSTER" \
+        --services "$ECS_SERVICE_RELAY" "$ECS_SERVICE_PLATFORM" "$ECS_SERVICE_GATEWAY" "$ECS_SERVICE_ORCHESTRATOR" \
+        --region "$AWS_REGION" \
+        --query 'services[*].[serviceName,status,runningCount,desiredCount]' \
+        --output table
+
+    echo ""
+    echo -e "${CYAN}=== CloudFront Distributions ===${NC}"
+    echo ""
+
+    aws cloudfront list-distributions \
+        --query 'DistributionList.Items[*].[Aliases.Items[0],Status,DomainName]' \
+        --output table
+
+    echo ""
+    echo -e "${CYAN}=== S3 Buckets ===${NC}"
+    echo ""
+
+    for bucket in "$S3_BUCKET_APP" "$S3_BUCKET_LANDING" "$S3_BUCKET_ACCOUNT"; do
+        size=$(aws s3 ls "s3://$bucket" --summarize --recursive 2>/dev/null | grep "Total Size" | awk '{print $3}')
+        echo "  $bucket: ${size:-0} bytes"
+    done
+
+    log_success "Production status check complete"
 }
 
 # =============================================================================
@@ -266,9 +394,9 @@ usage() {
     echo ""
     echo "Environments:"
     echo "  ote         Development test server (43.200.173.78)"
-    echo "  production  Production (AWS)"
+    echo "  prod        Production (AWS ECS/S3/CloudFront)"
     echo ""
-    echo "Services:"
+    echo "Services (OTE):"
     echo "  web         Frontend (React)"
     echo "  relay       Relay server (Spring Boot)"
     echo "  agent       Agent (Node.js)"
@@ -276,16 +404,29 @@ usage() {
     echo "  all         All services"
     echo "  status      Check service status"
     echo ""
+    echo "Services (Production):"
+    echo "  web/app     Web App (app.sessioncast.io → S3/CloudFront)"
+    echo "  landing     Landing Page (www.sessioncast.io → S3/CloudFront)"
+    echo "  relay       Relay Server (relay.sessioncast.io → ECS)"
+    echo "  platform    Platform API (api.sessioncast.io → ECS)"
+    echo "  gateway     API Gateway (→ ECS)"
+    echo "  orchestrator Orchestrator (→ ECS)"
+    echo "  all         All services"
+    echo "  status      Check service status"
+    echo ""
     echo "Options:"
-    echo "  --build     Build locally before deploying"
+    echo "  --build     Build locally before deploying (OTE only)"
     echo "  --dry-run   Show what would be done without doing it"
     echo "  -h, --help  Show this help"
     echo ""
     echo "Examples:"
-    echo "  $0 ote web"
-    echo "  $0 ote relay --build"
-    echo "  $0 ote status"
-    echo "  $0 production web"
+    echo "  $0 ote status              # Check OTE status"
+    echo "  $0 ote web                 # Deploy web to OTE"
+    echo "  $0 ote relay --build       # Build locally, deploy to OTE"
+    echo "  $0 prod status             # Check Production status"
+    echo "  $0 prod web                # Deploy web to Production"
+    echo "  $0 prod relay              # Deploy relay to Production ECS"
+    echo "  $0 prod all                # Deploy all to Production"
 }
 
 main() {
@@ -368,14 +509,34 @@ main() {
             ;;
         production|prod)
             case "$service" in
-                web)
-                    [[ "$dry_run" != "true" ]] && deploy_prod_web
+                web|app)
+                    [[ "$dry_run" != "true" ]] && deploy_prod_web_app
+                    ;;
+                landing)
+                    [[ "$dry_run" != "true" ]] && deploy_prod_web_landing
                     ;;
                 relay)
-                    [[ "$dry_run" != "true" ]] && deploy_prod_ecs "sessioncast-relay" "sessioncast-relay"
+                    [[ "$dry_run" != "true" ]] && deploy_prod_relay
                     ;;
                 platform)
-                    [[ "$dry_run" != "true" ]] && deploy_prod_ecs "sessioncast-platform" "sessioncast-platform"
+                    [[ "$dry_run" != "true" ]] && deploy_prod_platform
+                    ;;
+                gateway)
+                    [[ "$dry_run" != "true" ]] && deploy_prod_gateway
+                    ;;
+                orchestrator)
+                    [[ "$dry_run" != "true" ]] && deploy_prod_orchestrator
+                    ;;
+                all)
+                    [[ "$dry_run" != "true" ]] && {
+                        deploy_prod_web_app
+                        deploy_prod_relay
+                        deploy_prod_platform
+                        deploy_prod_gateway
+                    }
+                    ;;
+                status)
+                    check_prod_status
                     ;;
                 *)
                     log_error "Unknown service: $service"
