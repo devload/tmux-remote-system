@@ -1,0 +1,80 @@
+# SessionCast Deployment Environments Configuration
+
+environments:
+  ote:
+    name: "OTE (Development Test Server)"
+    host: "43.200.173.78"
+    user: "ec2-user"
+    ssh_key: "~/.ssh/id_rsa"
+
+    services:
+      web:
+        type: "static"
+        path: "/home/ec2-user/sessioncast-web"
+        build_cmd: "npm run build"
+        restart_cmd: "sudo systemctl restart nginx"
+
+      relay:
+        type: "spring-boot"
+        path: "/home/ec2-user/sessioncast-relay"
+        jar: "relay-spring-0.0.1-SNAPSHOT.jar"
+        port: 8080
+        restart_cmd: "sudo systemctl restart sessioncast-relay"
+
+      agent:
+        type: "node"
+        path: "/home/ec2-user/sessioncast-cli"
+        build_cmd: "npm run build"
+        restart_cmd: "pm2 restart sessioncast-agent || pm2 start dist/index.js --name sessioncast-agent -- agent"
+
+      platform:
+        type: "spring-boot"
+        path: "/home/ec2-user/sessioncast-platform"
+        jar: "platform-0.0.1-SNAPSHOT.jar"
+        port: 8081
+        restart_cmd: "sudo systemctl restart sessioncast-platform"
+
+  production:
+    name: "Production (AWS)"
+    region: "ap-northeast-2"
+
+    services:
+      web:
+        type: "s3-cloudfront"
+        bucket: "sessioncast-web"
+        distribution_id: "EXXXXXXXXXX"
+        domain: "app.sessioncast.io"
+
+      relay:
+        type: "ecs"
+        cluster: "sessioncast-cluster"
+        service: "sessioncast-relay"
+        repository: "sessioncast-relay"
+        domain: "relay.sessioncast.io"
+
+      platform:
+        type: "ecs"
+        cluster: "sessioncast-cluster"
+        service: "sessioncast-platform"
+        repository: "sessioncast-platform"
+        domain: "api.sessioncast.io"
+
+# Deployment workflows
+workflows:
+  full-deploy:
+    description: "Deploy all services"
+    steps:
+      - service: web
+      - service: relay
+      - service: platform
+
+  backend-only:
+    description: "Deploy backend services only"
+    steps:
+      - service: relay
+      - service: platform
+
+  frontend-only:
+    description: "Deploy frontend only"
+    steps:
+      - service: web
