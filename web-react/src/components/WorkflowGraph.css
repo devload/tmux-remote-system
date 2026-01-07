@@ -1,0 +1,280 @@
+.workflow-graph {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary, #1a1a2e);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.workflow-graph-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--text-secondary, #8b949e);
+  font-size: 14px;
+}
+
+.graph-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+}
+
+.graph-icon {
+  font-size: 16px;
+}
+
+.graph-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary, #fff);
+}
+
+.graph-count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-secondary, #8b949e);
+}
+
+.graph-legend {
+  display: flex;
+  gap: 16px;
+  padding: 8px 16px;
+  background: var(--bg-tertiary, #252538);
+  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary, #8b949e);
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.legend-dot.pending {
+  background: #484f58;
+}
+
+.legend-dot.running {
+  background: #3a7bd5;
+  animation: pulse 2s infinite;
+}
+
+.legend-dot.completed {
+  background: #238636;
+}
+
+.legend-dot.failed {
+  background: #f85149;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.graph-container {
+  overflow: auto;
+  padding: 16px;
+  min-height: 200px;
+}
+
+.graph-svg {
+  display: block;
+  margin: 0 auto;
+}
+
+.graph-edge {
+  stroke: #6e7681;
+  stroke-width: 1.5;
+  fill: none;
+}
+
+.graph-edge.highlighted {
+  stroke: var(--accent, #10a37f);
+  stroke-width: 2;
+}
+
+.graph-node {
+  transition: transform 0.2s;
+}
+
+.graph-node:hover {
+  transform: scale(1.02);
+}
+
+.graph-node.selected rect {
+  stroke-width: 2;
+}
+
+.graph-node.running rect {
+  animation: node-pulse 2s infinite;
+}
+
+@keyframes node-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
+.node-name {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.node-status {
+  font-size: 10px;
+  fill: var(--text-secondary, #8b949e);
+}
+
+.agent-details {
+  padding: 16px;
+  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  background: var(--bg-tertiary, #252538);
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.detail-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary, #fff);
+}
+
+.detail-status {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.detail-status.pending {
+  background: rgba(72, 79, 88, 0.2);
+  color: #8b949e;
+}
+
+.detail-status.running {
+  background: rgba(58, 123, 213, 0.2);
+  color: #58a6ff;
+}
+
+.detail-status.completed {
+  background: rgba(35, 134, 54, 0.2);
+  color: #3fb950;
+}
+
+.detail-status.failed {
+  background: rgba(248, 81, 73, 0.2);
+  color: #f85149;
+}
+
+.detail-tasks {
+  margin-bottom: 12px;
+}
+
+.tasks-label,
+.deps-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-tertiary, #6e7681);
+  font-weight: 500;
+}
+
+.tasks-list {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+  font-size: 12px;
+  color: var(--text-secondary, #8b949e);
+}
+
+.tasks-list li {
+  margin-bottom: 4px;
+}
+
+.tasks-list li.current {
+  color: #58a6ff;
+  font-weight: 500;
+}
+
+.tasks-list li.current::marker {
+  content: "▶ ";
+}
+
+.detail-deps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dep-chip {
+  background: var(--bg-secondary, #1a1a2e);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  color: var(--text-primary, #fff);
+  cursor: pointer;
+}
+
+.dep-chip:hover {
+  background: var(--accent, #10a37f);
+}
+
+/* Light mode */
+.light .workflow-graph {
+  background: #f6f8fa;
+}
+
+.light .graph-header {
+  border-bottom-color: #d0d7de;
+}
+
+.light .graph-title {
+  color: #1f2328;
+}
+
+.light .graph-legend {
+  background: #eaeef2;
+  border-bottom-color: #d0d7de;
+}
+
+.light .agent-details {
+  background: #eaeef2;
+  border-top-color: #d0d7de;
+}
+
+.light .detail-name {
+  color: #1f2328;
+}
+
+.light .dep-chip {
+  background: #fff;
+  color: #1f2328;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .graph-legend {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .graph-container {
+    padding: 8px;
+  }
+}

@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ConnectionStatus, Message, PlanLimitError, ProjectInfo, SessionInfo } from '../types';
+import {
+  ConnectionStatus,
+  Message,
+  PlanLimitError,
+  ProjectInfo,
+  SessionInfo,
+  ProjectStatusUpdate,
+  AgentStatusUpdate,
+  AgentOutputData,
+  ProjectInitResult,
+} from '../types';
 import pako from 'pako';
 
 // Decode base64 to UTF-8 string
@@ -112,6 +122,11 @@ interface UseWebSocketOptions {
   onUploadError?: (error: UploadError) => void;
   onAutoPilotStatus?: (status: AutoPilotStatus) => void;
   onAutoPilotResult?: (result: AutoPilotResult) => void;
+  // Project Mode callbacks
+  onProjectStatus?: (update: ProjectStatusUpdate) => void;
+  onAgentStatus?: (update: AgentStatusUpdate) => void;
+  onAgentOutput?: (data: AgentOutputData) => void;
+  onProjectInitResult?: (result: ProjectInitResult) => void;
 }
 
 export function useWebSocket({
@@ -126,6 +141,10 @@ export function useWebSocket({
   onUploadError,
   onAutoPilotStatus,
   onAutoPilotResult,
+  onProjectStatus,
+  onAgentStatus,
+  onAgentOutput,
+  onProjectInitResult,
 }: UseWebSocketOptions) {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
   const wsRef = useRef<WebSocket | null>(null);
@@ -295,6 +314,60 @@ export function useWebSocket({
               console.error('Server error:', message.meta);
             }
             break;
+
+          // Project Mode messages
+          case 'projectStatus':
+            if (message.meta) {
+              console.log('[WS] Project status update:', message.meta);
+              const agents = message.meta.agents ? JSON.parse(message.meta.agents) : undefined;
+              const sources = message.meta.sources ? JSON.parse(message.meta.sources) : undefined;
+              const workflow = message.meta.workflow ? JSON.parse(message.meta.workflow) : undefined;
+              onProjectStatus?.({
+                projectId: message.meta.projectId || '',
+                status: message.meta.status as ProjectStatusUpdate['status'],
+                mission: message.meta.mission,
+                agents,
+                sources,
+                workflow,
+              });
+            }
+            break;
+
+          case 'agentStatus':
+            if (message.meta) {
+              console.log('[WS] Agent status update:', message.meta);
+              onAgentStatus?.({
+                projectId: message.meta.projectId || '',
+                agentId: message.meta.agentId || '',
+                status: message.meta.status as AgentStatusUpdate['status'],
+                currentTask: message.meta.currentTask,
+                progress: message.meta.progress,
+                output: message.meta.output,
+                error: message.meta.error,
+              });
+            }
+            break;
+
+          case 'agentOutput':
+            if (message.meta) {
+              onAgentOutput?.({
+                projectId: message.meta.projectId || '',
+                agentId: message.meta.agentId || '',
+                output: message.payload || message.meta.output || '',
+              });
+            }
+            break;
+
+          case 'projectInitResult':
+            if (message.meta) {
+              console.log('[WS] Project init result:', message.meta);
+              onProjectInitResult?.({
+                projectId: message.meta.projectId || '',
+                success: message.meta.success === 'true',
+                error: message.meta.error,
+              });
+            }
+            break;
         }
       } catch (e) {
         console.error('Failed to parse message:', e);
@@ -315,7 +388,7 @@ export function useWebSocket({
     };
 
     wsRef.current = ws;
-  }, [url, token, onScreen, onSessionList, onSessionStatus, onPlanLimitError, onProjectList, onUploadComplete, onUploadError, onAutoPilotStatus, onAutoPilotResult]);
+  }, [url, token, onScreen, onSessionList, onSessionStatus, onPlanLimitError, onProjectList, onUploadComplete, onUploadError, onAutoPilotStatus, onAutoPilotResult, onProjectStatus, onAgentStatus, onAgentOutput, onProjectInitResult]);
 
   const scheduleReconnect = useCallback(() => {
     // Don't reconnect if unmounted
@@ -440,6 +513,57 @@ export function useWebSocket({
     }
   }, []);
 
+  // Project Mode methods
+  const initProject = useCallback((machineId: string, projectName: string, projectPath: string) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      console.log('[WS] Sending initProject request:', { machineId, projectName, projectPath });
+      wsRef.current.send(JSON.stringify({
+        type: 'initProject',
+        meta: {
+          machineId,
+          projectName,
+          projectPath,
+        },
+      }));
+    }
+  }, []);
+
+  const startWorkflow = useCallback((projectId: string) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      console.log('[WS] Sending startWorkflow request:', { projectId });
+      wsRef.current.send(JSON.stringify({
+        type: 'startWorkflow',
+        meta: { projectId },
+      }));
+    }
+  }, []);
+
+  const stopWorkflow = useCallback((projectId: string) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      console.log('[WS] Sending stopWorkflow request:', { projectId });
+      wsRef.current.send(JSON.stringify({
+        type: 'stopWorkflow',
+        meta: { projectId },
+      }));
+    }
+  }, []);
+
+  const subscribeAgentOutput = useCallback((projectId: string, agentId: string) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      console.log('[WS] Subscribing to agent output:', { projectId, agentId });
+      wsRef.current.send(JSON.stringify({
+        type: 'subscribeAgentOutput',
+        meta: { projectId, agentId },
+      }));
+    }
+  }, []);
+
+  const refreshProjects = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'listProjects' }));
+    }
+  }, []);
+
   const uploadFile = useCallback(async (sessionId: string, file: File): Promise<void> => {
     if (wsRef.current?.readyState !== WebSocket.OPEN) {
       throw new Error('WebSocket not connected');
@@ -526,5 +650,11 @@ export function useWebSocket({
     renameSession,
     uploadFile,
     autopilotRequest,
+    // Project Mode methods
+    initProject,
+    startWorkflow,
+    stopWorkflow,
+    subscribeAgentOutput,
+    refreshProjects,
   };
 }

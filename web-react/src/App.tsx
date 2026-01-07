@@ -12,8 +12,10 @@ import { UpgradeDialog } from './components/UpgradeDialog';
 import { AdModal } from './components/AdModal';
 import { AutoPilot, AutoPilotStatus, AutoPilotResult } from './components/AutoPilot';
 import { useWebSocket } from './hooks/useWebSocket';
-import { PlanLimitError, ProjectInfo, SessionInfo } from './types';
+import { PlanLimitError, ProjectInfo, SessionInfo, ProjectStatusUpdate, AgentStatusUpdate } from './types';
 import { ProjectList } from './components/ProjectList';
+import { ProjectDetail } from './components/ProjectDetail';
+import { ProjectInit } from './components/ProjectInit';
 import './App.css';
 
 // OTE environment detection
@@ -164,6 +166,11 @@ function App() {
   const [autopilotStatus, setAutopilotStatus] = useState<AutoPilotStatus | null>(null);
   const [autopilotResult, setAutopilotResult] = useState<AutoPilotResult | null>(null);
 
+  // Project Mode state
+  const [currentProject, setCurrentProject] = useState<string | null>(null);
+  const [showProjectInit, setShowProjectInit] = useState(false);
+  const [projectInitLoading, setProjectInitLoading] = useState(false);
+
   const handleScreen = useCallback((sessionId: string, data: string) => {
     // Use ref to always get current session value
     if (sessionId === currentSessionRef.current) {
@@ -215,7 +222,54 @@ function App() {
     }
   }, []);
 
-  const { status, joinSession, sendKeys, createSession, sendResize, killSession, renameSession, autopilotRequest } = useWebSocket({
+  // Project Mode handlers
+  const handleProjectStatus = useCallback((update: ProjectStatusUpdate) => {
+    console.log('[App] Project status update:', update);
+    setProjects(prev => prev.map(p =>
+      p.projectId === update.projectId
+        ? { ...p, status: update.status, mission: update.mission ?? p.mission, agents: update.agents ?? p.agents, sources: update.sources ?? p.sources }
+        : p
+    ));
+  }, []);
+
+  const handleAgentStatus = useCallback((update: AgentStatusUpdate) => {
+    console.log('[App] Agent status update:', update);
+    setProjects(prev => prev.map(p => {
+      if (p.projectId !== update.projectId) return p;
+      const agents = p.agents?.map(a =>
+        a.id === update.agentId
+          ? { ...a, status: update.status, currentTask: update.currentTask, progress: update.progress, output: update.output, error: update.error }
+          : a
+      );
+      return { ...p, agents };
+    }));
+  }, []);
+
+  const handleProjectInitResult = useCallback((result: { projectId: string; success: boolean; error?: string }) => {
+    console.log('[App] Project init result:', result);
+    setProjectInitLoading(false);
+    if (result.success) {
+      setShowProjectInit(false);
+      setCurrentProject(result.projectId);
+    } else {
+      console.error('Project init failed:', result.error);
+    }
+  }, []);
+
+  const {
+    status,
+    joinSession,
+    sendKeys,
+    createSession,
+    sendResize,
+    killSession,
+    renameSession,
+    autopilotRequest,
+    initProject,
+    startWorkflow,
+    stopWorkflow,
+    subscribeAgentOutput,
+  } = useWebSocket({
     url: wsUrl || '',
     token: authToken,
     onScreen: handleScreen,
@@ -225,6 +279,9 @@ function App() {
     onProjectList: handleProjectList,
     onAutoPilotStatus: handleAutoPilotStatus,
     onAutoPilotResult: handleAutoPilotResult,
+    onProjectStatus: handleProjectStatus,
+    onAgentStatus: handleAgentStatus,
+    onProjectInitResult: handleProjectInitResult,
   });
 
   const handleCreateSession = useCallback((machineId: string, sessionName: string) => {
@@ -247,6 +304,35 @@ function App() {
       return next;
     });
   }, []);
+
+  // Project Mode action handlers
+  const handleSelectProject = useCallback((projectId: string) => {
+    setCurrentProject(projectId);
+    setSidebarOpen(false);
+  }, []);
+
+  const handleBackToProjectList = useCallback(() => {
+    setCurrentProject(null);
+  }, []);
+
+  const handleStartWorkflow = useCallback((projectId: string) => {
+    startWorkflow(projectId);
+  }, [startWorkflow]);
+
+  const handleStopWorkflow = useCallback((projectId: string) => {
+    stopWorkflow(projectId);
+  }, [stopWorkflow]);
+
+  const handleInitProject = useCallback((machineId: string, projectName: string, projectPath: string) => {
+    setProjectInitLoading(true);
+    initProject(machineId, projectName, projectPath);
+  }, [initProject]);
+
+  const handleSubscribeAgentOutput = useCallback((projectId: string, agentId: string) => {
+    subscribeAgentOutput(projectId, agentId);
+  }, [subscribeAgentOutput]);
+
+  const currentProjectInfo = projects.find(p => p.projectId === currentProject);
 
   // Filter out hidden sessions
   const visibleSessions = sessions.filter(s => !hiddenSessions.has(s.id));
@@ -378,8 +464,21 @@ function App() {
             authToken={authToken || undefined}
             userName={userName}
           />
+        ) : currentProjectInfo ? (
+          <ProjectDetail
+            project={currentProjectInfo}
+            onBack={handleBackToProjectList}
+            onStartWorkflow={handleStartWorkflow}
+            onStopWorkflow={handleStopWorkflow}
+            onSubscribeAgentOutput={handleSubscribeAgentOutput}
+          />
         ) : (
-          <ProjectList projects={projects} />
+          <ProjectList
+            projects={projects}
+            currentProjectId={currentProject}
+            onSelectProject={handleSelectProject}
+            onNewProject={() => setShowProjectInit(true)}
+          />
         )}
       </div>
       {showTokenManager && authToken && (
@@ -414,6 +513,15 @@ function App() {
         onClose={() => setShowAdModal(false)}
         onUpgrade={() => window.open('/pricing', '_blank')}
       />
+      {/* Project Init modal */}
+      {showProjectInit && (
+        <ProjectInit
+          sessions={sessions}
+          onInit={handleInitProject}
+          onClose={() => setShowProjectInit(false)}
+          isLoading={projectInitLoading}
+        />
+      )}
       <div className="main-content">
         <AutoPilot
           onExecute={handleAutoPilotExecute}
